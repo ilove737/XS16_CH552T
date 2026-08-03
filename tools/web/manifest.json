@@ -1,0 +1,18 @@
+{
+  "name": "XS16 键位映射编辑器",
+  "short_name": "XS16 Keymap",
+  "description": "Niuer XS16 分体键盘键位读写配置（WebHID）",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1e1e1e",
+  "theme_color": "#1e1e1e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

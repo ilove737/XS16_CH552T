@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "description": "Default capability for XS16 keymap editor",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open"
+  ]
+}

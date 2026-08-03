@@ -1,0 +1,204 @@
+name: Build
+
+on:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  # ===========================================================================
+  # 固件：SDCC 编译 CH552 左右手两个变体
+  # ===========================================================================
+  firmware:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDCC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sdcc
+
+      - name: Build firmware
+        run: make
+
+      - name: Upload firmware
+        run: |
+          cd build
+          tar czf /tmp/xs40-firmware.tar.gz left/*.hex right/*.hex
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xs40-firmware
+          path: /tmp/xs40-firmware.tar.gz
+
+  # ===========================================================================
+  # Linux (Debian 容器)
+  # ===========================================================================
+  linux:
+    runs-on: ubuntu-24.04
+    container: debian:bookworm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          apt-get update
+          apt-get install -y curl build-essential pkg-config \
+            libwebkit2gtk-4.1-dev libsoup-3.0-dev libhidapi-dev libudev-dev \
+            nodejs npm
+
+      - name: Install Rust
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+      - name: Build Tauri app
+        env:
+          CARGO_HOME: /root/.cargo
+        run: |
+          . "$HOME/.cargo/env"
+          cargo install tauri-cli --version "^2" --locked
+          cd tools/app
+          npm install
+          cargo tauri build 2>&1
+
+      - name: Upload .deb
+        run: |
+          mkdir -p /tmp/artifacts
+          cp tools/app/src-tauri/target/release/bundle/deb/*.deb /tmp/artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xs40keymap-linux-deb
+          path: /tmp/artifacts/*.deb
+
+      - name: Upload binary (compressed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: xs40keymap-linux-bin
+          path: tools/app/src-tauri/target/release/xs40keymap
+
+  # ===========================================================================
+  # macOS（只上传二进制，跳过打包）
+  # ===========================================================================
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tools/app/package-lock.json
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install npm dependencies
+        working-directory: tools/app
+        run: npm install
+
+      - name: Build frontend
+        working-directory: tools/app
+        run: npm run build
+
+      - name: Build binary only
+        working-directory: tools/app/src-tauri
+        run: cargo build --release 2>&1
+
+      - name: Upload binary (compressed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: xs40keymap-macos-bin
+          path: tools/app/src-tauri/target/release/xs40keymap
+
+  # ===========================================================================
+  # Windows
+  # ===========================================================================
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tools/app/package-lock.json
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install npm dependencies
+        working-directory: tools/app
+        run: npm install
+
+      - name: Build Tauri app
+        working-directory: tools/app
+        run: cargo tauri build 2>&1
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xs40keymap-windows
+          path: tools/app/src-tauri/target/release/bundle/
+
+  # ===========================================================================
+  # 发布：将产物上传到 GitHub Release
+  # ===========================================================================
+  release:
+    if: github.event_name == 'release'
+    needs: [firmware, linux, macos, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: xs40keymap-linux-deb
+          path: /tmp/release-artifacts/
+      - uses: actions/download-artifact@v4
+        with:
+          name: xs40keymap-linux-bin
+          path: /tmp/release-artifacts/linux/
+      - uses: actions/download-artifact@v4
+        with:
+          name: xs40keymap-macos-bin
+          path: /tmp/release-artifacts/macos/
+      - uses: actions/download-artifact@v4
+        with:
+          name: xs40keymap-windows
+          path: /tmp/release-artifacts/windows/
+      - uses: actions/download-artifact@v4
+        with:
+          name: xs40-firmware
+          path: /tmp/release-artifacts/
+
+      - name: Rename platform binaries to avoid overwrite
+        run: |
+          [ -f /tmp/release-artifacts/linux/xs40keymap ] && \
+            mv /tmp/release-artifacts/linux/xs40keymap /tmp/release-artifacts/xs40keymap-linux
+          [ -f /tmp/release-artifacts/macos/xs40keymap ] && \
+            mv /tmp/release-artifacts/macos/xs40keymap /tmp/release-artifacts/xs40keymap-macos
+          [ -d /tmp/release-artifacts/windows ] && \
+            mv /tmp/release-artifacts/windows/* /tmp/release-artifacts/ 2>/dev/null; \
+            rmdir /tmp/release-artifacts/windows 2>/dev/null; true
+          rm -rf /tmp/release-artifacts/linux /tmp/release-artifacts/macos
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: /tmp/release-artifacts/**
+          tag_name: ${{ github.event.release.tag_name }}
+          make_latest: false

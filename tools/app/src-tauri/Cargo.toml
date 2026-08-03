@@ -1,0 +1,24 @@
+[package]
+name = "xs16-keymap-tauri"
+version = "1.0.0"
+description = "XS16_CH552T 键位映射编辑器 (Tauri 桌面版)"
+authors = ["lxs"]
+edition = "2021"
+
+[[bin]]
+name = "xs16keymap"
+path = "src/main.rs"
+
+[lib]
+name = "xs16_keymap_tauri"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hidapi = "2"

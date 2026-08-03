@@ -1,0 +1,69 @@
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+# 构建产物目录（build/left、build/right）
+build/
+
+# Python
+__pycache__/
+*.pyc
+
+# Node / npm
+node_modules/
+tools/app/dist/
+tools/app/package-lock.json
+
+# Rust / Tauri build output
+tools/app/src-tauri/target/
+tools/app/src-tauri/Cargo.lock
+tools/app/src-tauri/gen/
