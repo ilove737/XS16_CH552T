@@ -74,6 +74,9 @@ struct PollStatus {
 fn list_devices(state: State<AppState>) -> Result<Vec<DeviceInfo>, String> {
     let api = HidApi::new().map_err(|e| e.to_string())?;
     let mut out = Vec::new();
+    // 同一台键盘固件暴露了多个 HID 接口（Keyboard + Mouse），
+    // 每个接口 VID:PID 相同，只取第一个匹配接口（interface 0，即键盘通信接口），
+    // 避免前端把一台物理设备显示成多个。
     for d in api.device_list() {
         if d.vendor_id() == VID && d.product_id() == PID {
             let serial = d.serial_number().unwrap_or("").to_string();
@@ -87,6 +90,7 @@ fn list_devices(state: State<AppState>) -> Result<Vec<DeviceInfo>, String> {
                 product,
                 serial,
             });
+            break; // 单设备：只取第一个接口，跳过 Mouse 等辅助接口
         }
     }
     Ok(out)
