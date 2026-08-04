@@ -91,64 +91,28 @@ main {
   min-height: 0;
 }
 
-.sidebar {
-  width: 230px;
-  flex-shrink: 0;
-  background: #fff;
-  border-right: 1px solid #e1e4e8;
-  padding: 12px;
-  overflow-y: auto;
-}
-.sidebar-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-  font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-}
-.sidebar-help-btn {
-  flex: 0 0 auto;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 1px solid #cfd4da;
-  background: #f8f9fa;
-  border-radius: 50%;
-  color: #3498db;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-}
-.sidebar-help-btn:hover { background: #eef1f5; }
-.tree { list-style: none; margin: 0; padding: 0; }
-.tree .tree-dev {
-  font-weight: 600;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  user-select: none;
-}
-.tree .tree-dev:hover { background: #eef1f5; }
-.tree .tree-dev.active { background: #d6eaf8; }
-.tree .tree-dev ul { list-style: none; margin: 4px 0 0 14px; padding: 0; }
-.tree .tree-layer {
-  padding: 4px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: #444;
-  font-weight: 400;
-}
-.tree .tree-layer:hover { background: #eef1f5; }
-.tree .tree-layer.active { background: #aed6f1; color: #1a5276; font-weight: 600; }
 .hint { font-size: 12px; color: #999; margin-top: 10px; line-height: 1.5; }
 
 .editor {
   flex: 1;
   padding: 16px 20px;
   overflow-y: auto;
+}
+.layers {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.layer-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.layer-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 8px;
 }
 
 /* 右侧场景面板 */

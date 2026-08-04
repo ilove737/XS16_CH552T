@@ -13,11 +13,11 @@ const COLS = 4;
 const state = {
   devices: [],                 // DeviceInfo[] (来自 Rust 后端)
   currentDevice: null,         // DeviceInfo | null
-  currentLayer: 0,             // 0=主层, 1=Fn 层
   scene: 0,                    // 当前编辑的场景槽（0~5），选中态
   activeScene: -1,             // 外部激活高亮槽（仅展示，不选中），-1 表示无
   data: km.makeDefaultKeymap(),// 当前显示/编辑的 480 字节（渲染用本地副本）
   editIdx: -1,
+  editLayer: 0,                // 当前编辑的层（0=主层, 1=Fn 层），由 openEdit 设置
 };
 let capture = null;
 
@@ -39,8 +39,9 @@ function init() {
   // 启动后端自动轮询（X11 检测 + 场景匹配 + 下发，全部在 Rust 线程中完成）
   ipc.startAutoPoll().catch((e) => console.warn('启动自动轮询失败:', e));
   // 跟踪当前激活场景：轻量轮询后端 get_poll_status 仅做高亮，不下发
-  setInterval(syncActiveScene, 2000);
-  setTimeout(() => onRefresh(), 100);
+  setInterval(syncActiveScene, 1000);
+  // 当前仅支持单设备：启动自动枚举并选中第一台
+  setTimeout(() => autoConnect(), 100);
 }
 
 // 跟踪当前激活场景：读取 X11 前台应用匹配到的场景槽并高亮（仅绿色原点展示，不选中/不切换网格）
@@ -107,7 +108,7 @@ function buildSceneList() {
     li.append(idx, info);
     li.addEventListener('click', () => {
       state.scene = s;
-      renderGrid();
+      renderGrids();
       highlightScene();
       setStatus(`切换到场景槽 ${state.scene}（${sceneLabel(state.scene)}）`);
     });
@@ -165,76 +166,40 @@ function buildKeynameDatalist() {
   }
 }
 
-// ---- 设备连接 / 枚举 ----
+// ---- 设备连接 / 枚举（当前仅支持单台 XS16）----
 
-async function onConnect() {
+function hasDevice(dev) {
+  return state.devices.some((d) => d.path === dev.path);
+}
+
+/** 启动自动枚举并选中第一台设备（替代原「连接键盘 / 刷新」按钮） */
+async function autoConnect() {
   try {
     setStatus('正在枚举设备…');
     const devs = await ipc.listDevices();
-    if (!devs.length) {
-      setStatus('未检测到 XS16 键盘，请确认 USB 已连接');
-      return;
-    }
     let ok = 0, fail = 0;
     for (const dev of devs) {
+      if (hasDevice(dev)) { ok++; continue; }
       try {
         await ipc.openDevice(dev.path);
-        if (!hasDevice(dev)) state.devices.push(dev);
+        state.devices.push(dev);
         ok++;
       } catch (e) {
         fail++;
         console.warn('打开设备失败:', dev, e);
       }
     }
-    refreshTree();
-    updateConnBadge();
-    // 自动选中第一个设备的主层
-    if (state.devices.length > 0 && !state.currentDevice) {
-      await selectDevice(state.devices[0], 0);
-    }
-    if (fail) {
-      setStatus(`已连接 ${ok} 个键盘，但 ${fail} 个打开失败`);
-    } else if (ok) {
-      setStatus(`已连接 ${ok} 个键盘`);
-    } else {
-      setStatus('未连接任何设备');
-    }
-  } catch (e) {
-    setStatus('连接失败: ' + e.message);
-  }
-}
-
-function hasDevice(dev) {
-  return state.devices.some((d) => d.path === dev.path);
-}
-
-async function onRefresh() {
-  try {
-    const devs = await ipc.listDevices();
-    let ok = 0, fail = 0;
-    for (const d of devs) {
-      if (hasDevice(d)) { ok++; continue; }
-      try {
-        await ipc.openDevice(d.path);
-        state.devices.push(d);
-        ok++;
-      } catch (e) {
-        fail++;
-        console.warn('打开设备失败:', d, e);
-      }
-    }
     // 移除已拔出的设备
     state.devices = state.devices.filter((d) =>
       devs.some((n) => n.path === d.path)
     );
-    refreshTree();
     updateConnBadge();
-    // 自动选中第一个设备的主层
+    // 当前仅支持单设备：自动选中第一个设备
     if (state.devices.length > 0 && !state.currentDevice) {
-      await selectDevice(state.devices[0], 0);
+      await selectDevice(state.devices[0]);
     }
     if (state.devices.length === 0) {
-      renderGrid();
+      renderGrids();
       setStatus('未检测到 XS16 键盘，请确认 USB 已连接');
     } else if (fail) {
       setStatus(`已枚举 ${ok} 个键盘，但 ${fail} 个打开失败`);
@@ -257,58 +222,11 @@ function updateConnBadge() {
   }
 }
 
-// ---- 树形（设备 → 层）----
+// ---- 选择设备（当前仅支持单设备）----
 
-function refreshTree() {
-  const tree = $('deviceTree');
-  tree.innerHTML = '';
-  if (state.devices.length === 0) {
-    $('sideHint').hidden = false;
-    return;
-  }
-  $('sideHint').hidden = true;
-
-  state.devices.forEach((dev) => {
-    const devLi = document.createElement('li');
-    devLi.className = 'tree-dev';
-    devLi.dataset.kind = 'dev';
-    devLi.textContent = ipc.deviceLabel(dev);
-    devLi.onclick = () => selectDevice(dev, 0);
-
-    const ul = document.createElement('ul');
-    const li0 = document.createElement('li');
-    li0.className = 'tree-layer';
-    li0.textContent = '主层';
-    li0.onclick = (ev) => { ev.stopPropagation(); selectDevice(dev, 0); };
-    const li1 = document.createElement('li');
-    li1.className = 'tree-layer';
-    li1.textContent = 'Fn 层';
-    li1.onclick = (ev) => { ev.stopPropagation(); selectDevice(dev, 1); };
-    ul.append(li0, li1);
-    devLi.append(ul);
-    tree.append(devLi);
-  });
-  highlightCurrent();
-}
-
-function highlightCurrent() {
-  document.querySelectorAll('.tree-dev').forEach((devLi, i) => {
-    const dev = state.devices[i];
-    const isCur = dev === state.currentDevice;
-    devLi.classList.toggle('active', isCur);
-    devLi.querySelectorAll('.tree-layer').forEach((li, layer) => {
-      li.classList.toggle('active', isCur && layer === state.currentLayer);
-    });
-  });
-}
-
-// ---- 选择设备 / 层 ----
-
-async function selectDevice(dev, layer) {
+async function selectDevice(dev) {
   const prevDev = state.currentDevice;
-  const prevLayer = state.currentLayer;
   state.currentDevice = dev;
-  state.currentLayer = layer;
 
   setStatus(`正在读取 ${ipc.deviceLabel(dev)}...`);
   try {
@@ -319,17 +237,15 @@ async function selectDevice(dev, layer) {
     setStatus(`已读取 ${ipc.deviceLabel(dev)}`);
   } catch (e) {
     state.currentDevice = prevDev;
-    state.currentLayer = prevLayer;
     afterLoad();
     setStatus('读取失败: ' + e.message + '（保持上一键盘显示）');
   }
-  highlightCurrent();
 }
 
 function afterLoad() {
   refreshSceneList();
   highlightScene();
-  renderGrid();
+  renderGrids();
 }
 
 // ---- 网格渲染 ----
@@ -357,20 +273,24 @@ function keyDisplay(mod, key) {
   return { text, cls };
 }
 
-function renderGrid() {
-  const grid = $('grid');
+function renderGrids() {
+  renderOne($('gridMain'), 0);
+  renderOne($('gridFn'), 1);
+}
+
+function renderOne(grid, layer) {
   grid.innerHTML = '';
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const idx = row * COLS + col;
-      const [mod, key] = km.getKeyAt(state.data, state.scene, state.currentLayer, idx);
+      const [mod, key] = km.getKeyAt(state.data, state.scene, layer, idx);
       const btn = document.createElement('button');
       btn.className = 'key-btn';
       const disp = keyDisplay(mod, key);
       btn.classList.add(disp.cls);
       btn.textContent = disp.text;
-      btn.title = `索引 ${idx} (行${row} 列${col})  修饰符 0x${mod.toString(16).padStart(2, '0')} 键码 0x${key.toString(16).padStart(2, '0')}`;
-      btn.onclick = () => openEdit(idx);
+      btn.title = `索引 ${idx} (行${row} 列${col})  ${layer ? 'Fn层' : '主层'}  修饰符 0x${mod.toString(16).padStart(2, '0')} 键码 0x${key.toString(16).padStart(2, '0')}`;
+      btn.onclick = () => openEdit(idx, layer);
       grid.append(btn);
     }
   }
@@ -388,10 +308,11 @@ function switchEditMode(mode) {
   if (isMouse && capture) { capture.stop(); capture = null; }
 }
 
-function openEdit(idx) {
+function openEdit(idx, layer) {
   state.editIdx = idx;
-  const [mod, key] = km.getKeyAt(state.data, state.scene, state.currentLayer, idx);
-  const layerName = state.currentLayer ? 'Fn层' : '主层';
+  state.editLayer = layer;
+  const [mod, key] = km.getKeyAt(state.data, state.scene, layer, idx);
+  const layerName = layer ? 'Fn层' : '主层';
   $('modalTitle').textContent =
     `编辑键位 ${idx} (槽${state.scene}·${sceneLabel(state.scene)} ${layerName}, 行${Math.floor(idx / COLS)} 列${idx % COLS})`;
 
@@ -528,12 +449,13 @@ function collectKey() {
 function onOk() {
   const mod = collectMod();
   const key = collectKey();
-  km.setKeyAt(state.data, state.scene, state.currentLayer, state.editIdx, mod, key);
+  const layer = state.editLayer;
+  km.setKeyAt(state.data, state.scene, layer, state.editIdx, mod, key);
   ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
     console.warn('同步键位到后端失败:', e));
   closeEdit();
-  renderGrid();
-  setStatus(`已修改键位 槽${state.scene}·${state.currentLayer ? 'Fn' : '主'}·${state.editIdx}: mod=0x${mod.toString(16).padStart(2, '0')} key=0x${key.toString(16).padStart(2, '0')}`);
+  renderGrids();
+  setStatus(`已修改键位 槽${state.scene}·${layer ? 'Fn' : '主'}·${state.editIdx}: mod=0x${mod.toString(16).padStart(2, '0')} key=0x${key.toString(16).padStart(2, '0')}`);
 }
 
 function applyModToCheckboxes(mod) {
@@ -575,7 +497,7 @@ async function onWrite() {
 
 async function onRead() {
   if (!state.currentDevice) { setStatus('请先连接并选择键盘'); return; }
-  await selectDevice(state.currentDevice, state.currentLayer);
+  await selectDevice(state.currentDevice);
 }
 
 function onDefault() {
@@ -646,7 +568,7 @@ function exportFilename(ext) {
 }
 
 function exportTxt() {
-  if (!state.currentDevice) { alert('请先在左侧设备树中选择需要导出的键盘。'); return; }
+  if (!state.currentDevice) { alert('请先连接键盘后再导出。'); return; }
   const text = km.formatKeymapText(state.data);
   const name = exportFilename('txt');
   downloadBlob(new Blob([text], { type: 'text/plain' }), name);
@@ -654,7 +576,7 @@ function exportTxt() {
 }
 
 function exportBin() {
-  if (!state.currentDevice) { alert('请先在左侧设备树中选择需要导出的键盘。'); return; }
+  if (!state.currentDevice) { alert('请先连接键盘后再导出。'); return; }
   const name = exportFilename('bin');
   downloadBlob(new Blob([state.data], { type: 'application/octet-stream' }), name);
   setStatus('已导出 ' + name);
@@ -663,8 +585,6 @@ function exportBin() {
 // ---- 事件绑定 ----
 
 function bindEvents() {
-  $('btnConnect').onclick = onConnect;
-  $('btnRefresh').onclick = onRefresh;
   $('btnRead').onclick = onRead;
   $('btnWrite').onclick = onWrite;
   $('btnDefault').onclick = onDefault;

@@ -13,9 +13,6 @@
   </header>
 
   <div class="toolbar">
-    <button id="btnConnect" class="primary">连接键盘</button>
-    <button id="btnRefresh">刷新</button>
-    <span class="sep"></span>
     <button id="btnRead">读取设备</button>
     <button id="btnWrite" class="danger">写入设备</button>
     <button id="btnDefault">恢复默认</button>
@@ -27,15 +24,17 @@
   </div>
 
   <main>
-    <aside class="sidebar">
-      <div class="sidebar-title">
-        <span>设备 / 层</span>
-      </div>
-      <ul id="deviceTree" class="tree"></ul>
-      <p class="hint" id="sideHint">点击「连接键盘」枚举已插入的 XS16 键盘。</p>
-    </aside>
     <section class="editor">
-      <div class="grid" id="grid"></div>
+      <div class="layers">
+        <div class="layer-block">
+          <div class="layer-title">主层</div>
+          <div class="grid" id="gridMain"></div>
+        </div>
+        <div class="layer-block">
+          <div class="layer-title">Fn 层</div>
+          <div class="grid" id="gridFn"></div>
+        </div>
+      </div>
       <p class="grid-hint">点击任意按键进行编辑。每个按键 2 字节：[修饰符, 键码]。</p>
     </section>
     <aside class="scene-panel">
