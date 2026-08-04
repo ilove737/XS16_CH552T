@@ -10,7 +10,11 @@ use std::time::Duration;
 use hidapi::HidApi;
 use hidapi::HidDevice;
 use serde::Serialize;
-use tauri::State;
+use tauri::{
+    menu::{Menu, MenuItem, MenuEvent},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, RunEvent, State, WindowEvent,
+};
 
 const VID: u16 = 0x4c58;
 const PID: u16 = 0x5310;
@@ -477,6 +481,51 @@ fn get_poll_status(state: State<AppState>) -> Result<PollStatus, String> {
     })
 }
 
+// 创建系统托盘：图标 + 右键菜单（显示窗口 / 退出）+ 左键点击恢复窗口
+fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let icon_bytes = include_bytes!("../icons/icon.png");
+    let icon = tauri::image::Image::from_bytes(icon_bytes)?;
+
+    let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+
+    let _tray = TrayIconBuilder::with_id("main-tray")
+        .icon(icon)
+        .tooltip("XS16 键位映射编辑器")
+        .menu(&menu)
+        .on_menu_event(|app: &tauri::AppHandle, event: MenuEvent| match event.id().as_ref() {
+            "show" => {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.unminimize();
+                    let _ = w.set_focus();
+                }
+            }
+            "quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray: &tauri::tray::TrayIcon, event: TrayIconEvent| {
+            // 左键单击 / 双击托盘图标：恢复并聚焦窗口
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                if let Some(w) = tray.app_handle().get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.unminimize();
+                    let _ = w.set_focus();
+                }
+            }
+        })
+        .build(app)?;
+    Ok(())
+}
+
 fn open_first(api: &HidApi, _state: &State<AppState>) -> Result<HidDevice, String> {
     let dev = api
         .open(VID, PID)
@@ -497,6 +546,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState::default())
+        .setup(|app| {
+            // 创建系统托盘（图标 + 菜单 + 托盘点击恢复窗口）
+            setup_tray(app.handle())?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_devices,
             open_device,
@@ -511,6 +565,29 @@ pub fn run() {
             stop_auto_poll,
             get_poll_status,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .on_window_event(|window, event| {
+            // 拦截窗口关闭请求：隐藏到系统托盘而非退出进程
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // 真正退出前停止自动轮询线程（包括托盘"退出"触发的退出）
+            if let RunEvent::ExitRequested { .. } = event {
+                stop_poll_on_exit(app);
+            }
+        });
+}
+
+// 退出前停止自动轮询线程，避免后台线程残留/资源未释放
+fn stop_poll_on_exit(app: &tauri::AppHandle) {
+    let state = app.state::<AppState>();
+    state.poll.running.store(false, Ordering::SeqCst);
+    if let Some(h) = state.auto_poll.lock().unwrap().take() {
+        let _ = h.join();
+    }
+    println!("{} [auto_poll] stopped on exit", log_prefix());
 }

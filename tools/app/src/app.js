@@ -3,6 +3,7 @@
 import * as km from './keymap.js';
 import * as ipc from './ipc-hid.js';
 import { KeyCapture } from './capture.js';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const ROWS = 4;
 const COLS = 4;
@@ -676,6 +677,15 @@ function bindEvents() {
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (!$('modal').hidden) closeEdit();
+  });
+
+  // 关闭窗口 → 后端隐藏到系统托盘（不退出）。首次关闭时给一次性提示。
+  const win = getCurrentWindow();
+  win.onCloseRequested(() => {
+    if (!localStorage.getItem('xs16_tray_hinted')) {
+      localStorage.setItem('xs16_tray_hinted', '1');
+      setStatus('已最小化到系统托盘，右键托盘图标可退出');
+    }
   });
 }
 
