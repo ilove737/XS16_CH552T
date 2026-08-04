@@ -216,6 +216,19 @@ main {
   justify-content: center;
 }
 .scene-item.active .scene-idx { background: #2980b9; color: #fff; }
+/* 外部激活场景：在场景项右上角显示绿色原点，仅提示，不选中 */
+.scene-item.active-poll { position: relative; }
+.scene-item.active-poll::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.25);
+}
 .scene-info {
   display: flex;
   flex-direction: column;

@@ -14,7 +14,8 @@ const state = {
   devices: [],                 // DeviceInfo[] (来自 Rust 后端)
   currentDevice: null,         // DeviceInfo | null
   currentLayer: 0,             // 0=主层, 1=Fn 层
-  scene: 0,                    // 当前编辑的场景槽（0~5）
+  scene: 0,                    // 当前编辑的场景槽（0~5），选中态
+  activeScene: -1,             // 外部激活高亮槽（仅展示，不选中），-1 表示无
   data: km.makeDefaultKeymap(),// 当前显示/编辑的 480 字节（渲染用本地副本）
   editIdx: -1,
 };
@@ -37,18 +38,23 @@ function init() {
   bindEvents();
   // 启动后端自动轮询（X11 检测 + 场景匹配 + 下发，全部在 Rust 线程中完成）
   ipc.startAutoPoll().catch((e) => console.warn('启动自动轮询失败:', e));
-  // 当前应用栏：轻量轮询后端 get_poll_status 仅做展示，不下发
-  setInterval(refreshActiveAppInfo, 2000);
+  // 跟踪当前激活场景：轻量轮询后端 get_poll_status 仅做高亮，不下发
+  setInterval(syncActiveScene, 2000);
   setTimeout(() => onRefresh(), 100);
 }
 
-// 仅展示当前前台应用与已匹配场景（下发由后端自动完成）
-async function refreshActiveAppInfo() {
+// 跟踪当前激活场景：读取 X11 前台应用匹配到的场景槽并高亮（仅绿色原点展示，不选中/不切换网格）
+async function syncActiveScene() {
   try {
     const st = await ipc.getPollStatus();
-    const sceneName = st.matched_scene > 0 ? `场景${st.matched_scene}` : 'generic';
-    $('activeAppInfo').textContent =
-      st.app_name ? `${st.app_name} → ${sceneName}` : '—';
+    const s = st.matched_scene | 0;
+    if (s >= 0 && s < km.SCENE_MAX) {
+      if (s !== state.activeScene) {
+        state.activeScene = s;
+        highlightScene();
+      }
+      setStatus(`当前激活场景：场景${s}（${sceneLabel(s)}）`);
+    }
   } catch (e) {
     // 后端无 X11 等情况静默
   }
@@ -121,10 +127,12 @@ function refreshSceneList() {
   }
 }
 
-/** 高亮当前选中的场景项 */
+/** 高亮场景项：state.scene 为选中项（影响网格），state.activeScene 为外部激活项（仅绿色原点） */
 function highlightScene() {
   document.querySelectorAll('.scene-item').forEach((li) => {
-    li.classList.toggle('active', parseInt(li.dataset.scene, 10) === state.scene);
+    const s = parseInt(li.dataset.scene, 10);
+    li.classList.toggle('active', s === state.scene);            // 选中态
+    li.classList.toggle('active-poll', s === state.activeScene); // 外部激活高亮（不选中）
   });
 }
 
@@ -663,7 +671,6 @@ function bindEvents() {
   $('btnImport').onclick = onImport;
   $('btnExportTxt').onclick = exportTxt;
   $('btnExportBin').onclick = exportBin;
-  $('btnActiveApp').onclick = () => refreshActiveAppInfo();
   $('btnCancel').onclick = closeEdit;
   $('btnOk').onclick = onOk;
 
