@@ -13,7 +13,7 @@
 #include "Debug.H"
 #include "scanKey.h"
 
-// #include "CompositeKM.H"
+#include "CompositeKM.H"
 #include <string.h>
 #include "FlashWrite.h"
 
@@ -23,17 +23,21 @@
 UINT8X __at (0x0000) Ep0Buffer[8 > (THIS_ENDP0_SIZE + 2) ? 8 : (THIS_ENDP0_SIZE + 2)];   //端点0 OUT&IN缓冲区，必须是偶地址
 UINT8X __at (0x000a) Ep1Buffer[64 > (MAX_PACKET_SIZE + 2) ? 64 : (MAX_PACKET_SIZE + 2)]; //端点1 IN缓冲区,必须是偶地址
 UINT8X __at (0x0050) Ep2Buffer[64 > (MAX_PACKET_SIZE + 2) ? 64 : (MAX_PACKET_SIZE + 2)]; //端点2 IN缓冲区,必须是偶地址
-UINT8 SetupReq, SetupLen, Ready, Count, FLAG, UsbConfig;
+UINT8 SetupReq, Ready, Count, FLAG, UsbConfig;
+UINT16 SetupLen;
 PUINT8C pDescr;             //USB配置标志
 USB_SETUP_REQ SetupReqBuf; //暂存Setup包
 
-// 厂商自定义 HID Feature 报告：键位映射读写（Report ID = 1）
-#define KEYMAP_REPORT_ID  0x01
-UINT8X __at (0x0090) KeymapRxBuf[KEYMAP_WORD_CNT * 4]; // 160字节接收缓冲
-UINT8X KeymapTxBuf[KEYMAP_WORD_CNT * 4 + 1];           // Report ID + 160字节发送缓冲（读取用）
+UINT8X __at (0x0160) KeymapBuf[KEYMAP_BYTES + 1];   // 480 字节数据 + 1 Report ID 位 = 481
 volatile UINT8 keymapRxPending;  // 1=正在接收键位数据
-volatile UINT8 keymapRxOffset;   // 已接收字节数
+volatile UINT16 keymapRxOffset;  // 已接收字节数（含 Report ID 位，从 1 起始，最大 481）
 volatile UINT8 keymapSkipId;     // 1=数据阶段首字节为 Report ID，需跳过
+
+// 应用场景下行：走 SetReport 控制传输（EP0，wValue=0x0202）
+volatile UINT8 sceneCmdPending;
+
+// 当前应用场景 ID（由 EP0 SET_REPORT 控制传输接收更新，scanKey.c 据此选择 keyMap）
+volatile UINT8 currentScene;
 // sbit Ep2InKey = P1 ^ 5;
 __sbit __at (0xB5) CapsLED;
 
@@ -44,15 +48,17 @@ __sbit __at (0xB5) CapsLED;
 UINT8C DevDesc[18] = {0x12, 0x01, 0x10, 0x01, 0x00, 0x00, 0x00, THIS_ENDP0_SIZE,
                       0x58, 0x4c, 0x10, 0x53, 0x00, 0x00, 0x01, 0x03,
                       0x00, 0x01};
-UINT8C CfgDesc[59] =
+UINT8C CfgDesc[84] =
     {
-        0x09, 0x02, 0x3b, 0x00, 0x02, 0x01, 0x00, 0xA0, 0x32, //配置描述符
-        0x09, 0x04, 0x00, 0x00, 0x01, 0x03, 0x01, 0x01, 0x00, //接口描述符,键盘
-        0x09, 0x21, 0x11, 0x01, 0x00, 0x01, 0x22, 0x53, 0x00, //HID类描述符 (报表描述符 83 字节)
-        0x07, 0x05, 0x81, 0x03, 0x08, 0x00, 0x0a,             //端点描述符
-        0x09, 0x04, 0x01, 0x00, 0x01, 0x03, 0x01, 0x02, 0x00, //接口描述符,鼠标
+        0x09, 0x02, 0x4D, 0x00, 0x03, 0x01, 0x00, 0xA0, 0x32, //配置描述符（77 字节，3 个接口）
+        0x09, 0x04, 0x00, 0x00, 0x01, 0x03, 0x01, 0x01, 0x00, //接口描述符,键盘 IF0
+        0x09, 0x21, 0x11, 0x01, 0x00, 0x01, 0x22, 0x54, 0x00, //HID类描述符 (报表描述符 84 字节)
+        0x07, 0x05, 0x81, 0x03, 0x08, 0x00, 0x0a,             //端点描述符 1IN
+        0x09, 0x04, 0x01, 0x00, 0x01, 0x03, 0x01, 0x02, 0x00, //接口描述符,鼠标 IF1
         0x09, 0x21, 0x10, 0x01, 0x00, 0x01, 0x22, 0x34, 0x00, //HID类描述符
-        0x07, 0x05, 0x82, 0x03, 0x04, 0x00, 0x0a              //端点描述符
+        0x07, 0x05, 0x82, 0x03, 0x04, 0x00, 0x0a,             //端点描述符 2IN
+        0x09, 0x04, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, //接口描述符,厂商自定义 IF2（应用场景下行，仅 SET_REPORT，无中断端点）
+        0x09, 0x21, 0x00, 0x01, 0x00, 0x01, 0x22, 0x15, 0x00, //HID类描述符 (报表描述符 21 字节)
 };
 
 UINT8C MyProductIDInfo[] = {0x1c,0x03,'X',0,'S',0,'1',0,'6',0,' ',0,'K',0,'e',0,'y',0,'b',0,'o',0,'a',0,'r',0,'d',0}; // 产品信息字符串描述符
@@ -65,7 +71,7 @@ UINT8C MyProdInfo[ ] = { 0x0C, 0x03, 'C', 0, 'H', 0, '5', 0, '5', 0, '2', 0 };
 
 /*字符串描述符*/
 /*HID类报表描述符*/
-UINT8C KeyRepDesc[83] =
+UINT8C KeyRepDesc[84] =
     {
         0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x05, 0x07,
         0x19, 0xe0, 0x29, 0xe7, 0x15, 0x00, 0x25, 0x01,
@@ -83,7 +89,7 @@ UINT8C KeyRepDesc[83] =
         0x15, 0x00,              //   Logical Minimum (0)
         0x26, 0xff, 0x00,        //   Logical Maximum (255)
         0x75, 0x08,              //   Report Size (8)
-        0x95, 0x40,              //   Report Count (64)
+        0x96, 0xE0, 0x01,        //   Report Count (480 = 0x1E0)
         0xb1, 0x02,              //   Feature (Data,Var,Abs)
         0xC0, 0xC0               // End Collection
     };
@@ -96,6 +102,22 @@ UINT8C MouseRepDesc[52] =
         0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38,
         0x15, 0x81, 0x25, 0x7f, 0x75, 0x08, 0x95, 0x03,
         0x81, 0x06, 0xC0, 0xC0};
+/* 厂商自定义 Output 报告（应用场景下行，Report ID = 2）
+ * 主机通过 EP0 SET_REPORT 控制传输下发，不占用中断 OUT 端点。
+ * 数据：[0]=ReportID(0x02) [1]=SCENE_CMD_MAGIC(0x5C) [2]=场景ID [3..7]=0 */
+UINT8C VendorRepDesc[21] =
+    {
+        0xA1, 0x01,              // Collection (Application)
+        0x85, 0x02,              //   Report ID (2)
+        0x06, 0x00, 0xff,        //   Usage Page (Vendor Defined 0xFF00)
+        0x09, 0x02,              //   Usage (2)
+        0x15, 0x00,              //   Logical Minimum (0)
+        0x26, 0xff, 0x00,        //   Logical Maximum (255)
+        0x75, 0x08,              //   Report Size (8)
+        0x95, 0x08,              //   Report Count (8)
+        0x91, 0x02,              //   Output (Data,Var,Abs)
+        0xC0                     // End Collection
+    };
 /*鼠标数据*/
 UINT8 HIDMouse[4] = {0x0, 0x0, 0x0, 0x0};
 /*键盘数据*/
@@ -209,10 +231,21 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
             len = USB_RX_LEN;
             if (len == (sizeof(USB_SETUP_REQ)))
             {
-                SetupLen = UsbSetupBuf->wLengthL;
-                if (UsbSetupBuf->wLengthH || SetupLen > 0x7F)
+                // 每次新的 SETUP 都代表一次全新控制传输，必须清除上次残留状态，
+                // 否则主机若在中途放弃（如 GetReport 读取超时），固件会带着
+                // 残留的 SetupReq/SetupLen 进入等待 IN 中断状态，导致 EP0 卡死、
+                // 键盘整体无响应（bUC_INT_BUSY 会让所有端点 NAK），只能拔插恢复。
+                SetupReq = 0;
+                SetupLen = 0;
+                keymapRxPending = 0;
+                keymapSkipId = 0;
+                keymapRxOffset = 0;
+                sceneCmdPending = 0;
+
+                SetupLen = (UINT16)UsbSetupBuf->wLengthH << 8 | UsbSetupBuf->wLengthL;
+                if (SetupLen > 0x0200)
                 {
-                    SetupLen = 0x7F; // 限制总长度
+                    SetupLen = 0x0200; // 限制总长度（≤512，容纳 481 字节键位映射）
                 }
                 len = 0; // 默认为成功并且上传0长度
                 SetupReq = UsbSetupBuf->bRequest;
@@ -226,11 +259,11 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
                             UsbSetupBuf->wValueL == KEYMAP_REPORT_ID)
                         {
                             // 编号报告：数据阶段首字节必须为 Report ID
-                            KeymapTxBuf[0] = KEYMAP_REPORT_ID;
-                            readKeymapFromFlash((UINT8 __xdata *)(KeymapTxBuf + 1));
-                            SetupLen = (UINT8)(KEYMAP_WORD_CNT * 4 + 1);
+                            KeymapBuf[0] = KEYMAP_REPORT_ID;
+                            readKeymapFromFlash((UINT8 __xdata *)(KeymapBuf + 1));
+                            SetupLen = KEYMAP_BYTES + 1;   // 481 字节（480 数据 + Report ID）
                             len = SetupLen >= THIS_ENDP0_SIZE ? THIS_ENDP0_SIZE : SetupLen;
-                            memcpy(Ep0Buffer, KeymapTxBuf, len);
+                            memcpy(Ep0Buffer, KeymapBuf, len);
                             SetupLen -= len;
                         }
                         // 其它报告类型按原行为返回 0 长度（不 STALL）
@@ -244,21 +277,36 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
                         if (UsbSetupBuf->wValueH == 0x03 &&
                             UsbSetupBuf->wValueL == KEYMAP_REPORT_ID)
                         {
-                            if (UsbSetupBuf->wLengthL == KEYMAP_WORD_CNT * 4 + 1)
+                            UINT16 reqLen = (UINT16)UsbSetupBuf->wLengthH << 8 | UsbSetupBuf->wLengthL;
+                            if (reqLen == KEYMAP_BYTES + 1)
                             {
-                                // 标准编号报告：首字节为 Report ID（161 字节）
+                                // 标准编号报告：首字节为 Report ID（481 字节）
                                 keymapRxPending = 1;
-                                keymapRxOffset = 0;
+                                keymapRxOffset = 1;   // 数据区从 [1] 起（[0] 留给 Report ID）
                                 keymapSkipId = 1;
                                 len = 0; // 准备接收数据阶段
                             }
-                            else if (UsbSetupBuf->wLengthL == KEYMAP_WORD_CNT * 4)
+                            else if (reqLen == KEYMAP_BYTES)
                             {
-                                // 兼容不带 Report ID 的 160 字节
+                                // 兼容不带 Report ID 的 480 字节（数据同样落 [1..480]）
                                 keymapRxPending = 1;
-                                keymapRxOffset = 0;
+                                keymapRxOffset = 1;
                                 keymapSkipId = 0;
                                 len = 0;
+                            }
+                            else
+                            {
+                                len = 0xFF; // 长度不对
+                            }
+                        }
+                        // 场景下行命令（Output 报告，Report ID = 2）：[0]=ReportID(0x02) [1]=MAGIC(0x5C) [2]=scene
+                        else if (UsbSetupBuf->wValueH == 0x02 && UsbSetupBuf->wValueL == 0x02)
+                        {
+                            UINT16 reqLen = (UINT16)UsbSetupBuf->wLengthH << 8 | UsbSetupBuf->wLengthL;
+                            if (reqLen == 8)
+                            {
+                                sceneCmdPending = 1;
+                                len = 0; // 准备接收数据阶段
                             }
                             else
                             {
@@ -326,9 +374,14 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
                                 pDescr = MouseRepDesc; //数据准备上传
                                 len = sizeof(MouseRepDesc);
                             }
+                            else if (UsbSetupBuf->wIndexL == 2) //接口2报表描述符（厂商场景下行）
+                            {
+                                pDescr = VendorRepDesc; //数据准备上传
+                                len = sizeof(VendorRepDesc);
+                            }
                             else
                             {
-                                len = 0xff; //本程序只有2个接口，这句话正常不可能执行
+                                len = 0xff; //本程序只有3个接口，这句话正常不可能执行
                             }
                             break;
                         default:
@@ -494,9 +547,14 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
                 break;
             case 0x01: // GetReport：回传厂商 Feature 报告（键位映射）
                 len = SetupLen >= THIS_ENDP0_SIZE ? THIS_ENDP0_SIZE : SetupLen;
-                memcpy(Ep0Buffer, KeymapTxBuf + (KEYMAP_WORD_CNT * 4 + 1 - SetupLen), len);
+                memcpy(Ep0Buffer, KeymapBuf + (KEYMAP_BYTES + 1 - SetupLen), len);
                 SetupLen -= len;
                 UEP0_T_LEN = len;
+                if (SetupLen == 0)
+                {
+                    // 数据阶段全部发送完毕，清理状态，防止主机放弃后固件卡死在 GetReport
+                    SetupReq = 0;
+                }
                 UEP0_CTRL ^= bUEP_T_TOG; //同步标志位翻转
                 break;
             case USB_SET_ADDRESS:
@@ -516,6 +574,7 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
                 if (keymapRxPending)
                 {
                     // 厂商 Feature 报告：接收键位映射数据
+                    // 数据统一写入 KeymapBuf[1..480]（[0] 为 Report ID 位）
                     UINT8 i = 0;
                     if (keymapSkipId)
                     {
@@ -524,15 +583,27 @@ void DeviceInterrupt(void) __interrupt(INT_NO_USB) __using(1) //USB中断服务�
                     }
                     for (; i < len; i++)
                     {
-                        if (keymapRxOffset < KEYMAP_WORD_CNT * 4)
-                            KeymapRxBuf[keymapRxOffset++] = Ep0Buffer[i];
+                        if (keymapRxOffset < KEYMAP_BYTES + 1)
+                            KeymapBuf[keymapRxOffset++] = Ep0Buffer[i];
                     }
-                    if (keymapRxOffset >= KEYMAP_WORD_CNT * 4)
+                    if (keymapRxOffset >= KEYMAP_BYTES + 1)
                     {
-                        // 所有数据接收完毕，写入 Flash
-                        writeKeymapToFlash(KeymapRxBuf);
+                        // 所有数据接收完毕，写入 Flash（数据区为 KeymapBuf[1..480]）
+                        writeKeymapToFlash((UINT8 __xdata *)(KeymapBuf + 1));
                         keymapRxPending = 0;
                     }
+                }
+                else if (sceneCmdPending)
+                {
+                    // 场景下行命令：Ep0Buffer[0]=ReportID(0x02) [1]=MAGIC(0x5C) [2]=scene
+                    if (len >= 3 && Ep0Buffer[1] == SCENE_CMD_MAGIC)
+                    {
+                        if (Ep0Buffer[2] < SCENE_MAX && Ep0Buffer[2] != currentScene)
+                        {
+                            currentScene = Ep0Buffer[2];
+                        }
+                    }
+                    sceneCmdPending = 0;
                 }
                 else
                 {

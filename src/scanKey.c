@@ -93,25 +93,26 @@ void makeHIDFrames(void)
      */
     PCON &= (~GF0); // 清零 Fn0 层标志位
     PCON &= (~GF1); // 清零 Fn1 层标志位
-    for (i = 0; i < 4; i++)
     {
-        if (allKey[i])	// 如果当前行有按键按下
+        // Fn 键识别基于当前场景槽的主层键位区（sceneMapTable[currentScene] + 16）
+        // 键位格式：[mod, key] 交替；mod == KEY_FnX(0xff) 表示该键是功能键，
+        //   key == 0 表示 Fn0 层，key == 1 表示 Fn1 层。
+        UINT8 scene = currentScene;
+        UINT8C *mainBase = sceneMapTable[scene] + MAP_MAIN_OFF;
+        for (i = 0; i < 4; i++)
         {
-            for (bit = 0; bit < 4; bit++)
+            if (allKey[i])	// 如果当前行有按键按下
             {
-                if (allKey[i] & (1 << bit))
+                for (bit = 0; bit < 4; bit++)
                 {
-                    UINT8 idx = i * 4 + bit;
-                    /*
-                     * Fn 键的识别方式：
-                     *   mainKeyMap[idx][0] == 0xff 表示该键是功能键
-                     *   mainKeyMap[idx][1] == 0    表示 Fn0 层
-                     *   mainKeyMap[idx][1] == 1    表示 Fn1 层
-                     */
-                    if (mainKeyMap[idx][0] == KEY_FnX)
+                    if (allKey[i] & (1 << bit))
                     {
-                        if (mainKeyMap[idx][1] == 0) PCON |= GF0;
-                        if (mainKeyMap[idx][1] == 1) PCON |= GF1;
+                        UINT8 idx = i * 4 + bit;
+                        if (mainBase[idx * 2] == KEY_FnX)
+                        {
+                            if (mainBase[idx * 2 + 1] == 0) PCON |= GF0;
+                            if (mainBase[idx * 2 + 1] == 1) PCON |= GF1;
+                        }
                     }
                 }
             }
@@ -127,7 +128,7 @@ void makeHIDFrames(void)
      * 此时填充 HIDMouse[4] 并通过端点 2 发送鼠标报告。
      */
     {
-        UINT8C (*keyMap)[2];  // 指向当前选中的键位映射表（Flash 地址）
+        UINT8C *keyMap;       // 指向当前选中的键位映射表（Flash 地址，按 [mod,key] 交替访问）
         UINT8 index;          // 按键索引（0~15）
         UINT8 mod;            // 修饰键位值（0xFE=鼠标动作, KEY_FnX=功能键, 其他=修饰键）
         UINT8 code;           // 按键键码（或鼠标动作码）
@@ -138,11 +139,20 @@ void makeHIDFrames(void)
         mouseDY = 0;
         mouseDW = 0;
 
-        // 根据 Fn 层状态选择键位映射表
-        if (PCON & GF0)
-            keyMap = Fn0_keyMap;
-        else
-            keyMap = mainKeyMap;
+        // 根据 Fn 层状态从当前场景槽（sceneMapTable[currentScene]）取键位表
+        // 每槽 80 字节：[0..15]应用名 | [16..47]主层键位 | [48..79]Fn层键位
+        {
+            UINT8 scene = currentScene;
+            UINT8C *slot = sceneMapTable[scene];
+            if (PCON & (GF0 | GF1))
+            {
+                keyMap = slot + MAP_FN_OFF;      // Fn 层
+            }
+            else
+            {
+                keyMap = slot + MAP_MAIN_OFF;    // 主层
+            }
+        }
 
         for (i = 0; i < 4; i++)
         {
@@ -153,8 +163,8 @@ void makeHIDFrames(void)
                     if (allKey[i] & (1 << bit))
                     {
                         index = i * 4 + bit;
-                        mod = keyMap[index][0];
-                        code = keyMap[index][1];
+                        mod = keyMap[index * 2];
+                        code = keyMap[index * 2 + 1];
 
                         if (mod == 0xFE)
                         {
