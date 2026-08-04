@@ -56,6 +56,7 @@
         <div class="mode-toggle">
           <label><input type="radio" name="editMode" value="keyboard" checked> 键盘按键</label>
           <label><input type="radio" name="editMode" value="mouse"> 鼠标动作</label>
+          <label><input type="radio" name="editMode" value="deepin"> Deepin系统</label>
         </div>
         <fieldset class="mod-fieldset" id="modFieldset" hidden>
           <legend>修饰符</legend>
@@ -97,6 +98,13 @@
             <input type="text" id="nameInput" list="keynamelist" placeholder="KEY_A">
             <datalist id="keynamelist"></datalist>
           </div>
+        </fieldset>
+        <fieldset id="deepinFieldset" hidden>
+          <div class="deepin-tabs" id="deepinTabs">
+            <button type="button" class="deepin-tab active" data-source="system">系统快捷键</button>
+            <button type="button" class="deepin-tab" data-source="terminal">终端快捷键</button>
+          </div>
+          <div id="deepinList"></div>
         </fieldset>
         <p class="modal-hint" id="modalHint">在键盘上按下目标键，或点击下方键盘图直接选择。</p>
         <div id="kbd104Container"></div>

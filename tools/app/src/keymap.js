@@ -476,3 +476,144 @@ export const KEYBOARD_104 = [
     [18.5, 2, 0x62, '0\nIns'], [20.5, 1, 0x63, '.\nDel'],
   ],
 ];
+
+// =========================================================================
+// Deepin 系统快捷键（仅用于编辑弹窗内快速选择，不参与键盘映射逻辑）
+// category: 分组名称（显示在 UI 上）
+// items[].name: 快捷键说明文字
+// items[].mod:  修饰符掩码（与键盘映射一致：1=LCTRL 2=LSHIFT 4=LALT 8=LMETA …）
+// items[].key:  键码（HID usage），无法精确对应时填 0 仅作展示
+// items[].label: 用户可见的快捷键组合说明
+// =========================================================================
+export const DEEPIN_SHORTCUTS = [
+  {
+    category: '系统',
+    items: [
+      { name: '终端',                  mod: 0x05, key: 0x17, label: 'Ctrl+Alt+T' },
+      { name: '终端雷神模式',           mod: 0x04, key: 0x3b, label: 'Alt+F2' },
+      { name: '全局搜索',              mod: 0x02, key: 0x2c, label: 'Shift+Space' },
+      { name: '截图',                  mod: 0x05, key: 0x04, label: 'Ctrl+Alt+A' },
+      { name: '延时截图',              mod: 0x01, key: 0x46, label: 'Ctrl+Print' },
+      { name: '全屏截图',              mod: 0x00, key: 0x46, label: 'Print' },
+      { name: '窗口截图',              mod: 0x04, key: 0x46, label: 'Alt+Print' },
+      { name: '滚动截图',              mod: 0x05, key: 0x0c, label: 'Ctrl+Alt+I' },
+      { name: '图文识别',              mod: 0x05, key: 0x06, label: 'Ctrl+Alt+C' },
+      { name: '录屏',                  mod: 0x05, key: 0x15, label: 'Ctrl+Alt+R' },
+      { name: '切换同类型窗口',        mod: 0x04, key: 0x35, label: 'Alt+`' },
+      { name: '反向切换同类型窗口',    mod: 0x06, key: 0x35, label: 'Shift+Alt+~' },
+      { name: '显示工作区',            mod: 0x08, key: 0x16, label: 'Super+S' },
+      { name: '启动器',                mod: 0x08, key: 0x00, label: 'Super' },
+      { name: '切换窗口',              mod: 0x04, key: 0x2b, label: 'Alt+Tab' },
+      { name: '反向切换窗口',          mod: 0x06, key: 0x2b, label: 'Shift+Alt+Tab' },
+      { name: '显示桌面',              mod: 0x08, key: 0x07, label: 'Super+D' },
+      { name: '文件管理器',            mod: 0x08, key: 0x08, label: 'Super+E' },
+      { name: '锁屏界面',              mod: 0x08, key: 0x0f, label: 'Super+L' },
+      { name: '关机界面',              mod: 0x05, key: 0x4c, label: 'Ctrl+Alt+Delete' },
+      { name: '切换窗口效果',          mod: 0x0a, key: 0x2b, label: 'Shift+Super+Tab' },
+      { name: '系统监视器',            mod: 0x05, key: 0x29, label: 'Ctrl+Alt+Escape' },
+      { name: '剪贴板',                mod: 0x08, key: 0x19, label: 'Super+V' },
+      { name: '切换多屏模式',          mod: 0x08, key: 0x13, label: 'Super+P' }
+    ]
+  },
+  {
+    category: '窗口',
+    items: [
+      { name: '打开窗口菜单',         mod: 0x04, key: 0x2c, label: 'Alt+Space' },
+      { name: '最大化窗口',           mod: 0x08, key: 0x52, label: 'Super+↑' },
+      { name: '恢复窗口',             mod: 0x08, key: 0x51, label: 'Super+↓' },
+      { name: '最小化窗口',           mod: 0x08, key: 0x11, label: 'Super+N' },
+      { name: '移动窗口',             mod: 0x04, key: 0x40, label: 'Alt+F7' },
+      { name: '改变窗口大小',         mod: 0x04, key: 0x41, label: 'Alt+F8' },
+      { name: '关闭窗口',             mod: 0x04, key: 0x3d, label: 'Alt+F4' },
+      { name: '窗口快速铺至左侧',     mod: 0x08, key: 0x50, label: 'Super+←' },
+      { name: '窗口快速铺至右侧',     mod: 0x08, key: 0x4f, label: 'Super+→' }
+    ]
+  },
+  {
+    category: '工作空间',
+    items: [
+      { name: '切换到左边工作区', mod: 0x05, key: 0x50, label: 'Ctrl+Alt+←' },
+      { name: '切换到右边工作区', mod: 0x05, key: 0x4f, label: 'Ctrl+Alt+→' },
+      { name: '移动到左边工作区', mod: 0x07, key: 0x50, label: 'Shift+Ctrl+Alt+←' },
+      { name: '移动到右边工作区', mod: 0x07, key: 0x4f, label: 'Shift+Ctrl+Alt+→' }
+    ]
+  },
+  {
+    category: '辅助工具',
+    items: [
+      { name: '语音朗读',     mod: 0x05, key: 0x13, label: 'Ctrl+Alt+P' },
+      { name: '语音听写',     mod: 0x05, key: 0x07, label: 'Ctrl+Alt+D' },
+      { name: '文本翻译',     mod: 0x05, key: 0x18, label: 'Ctrl+Alt+U' },
+      { name: '屏幕放大',     mod: 0x08, key: 0x2e, label: 'Super+=' },
+      { name: '屏幕缩小',     mod: 0x08, key: 0x2d, label: 'Super+-' },
+      { name: '重置屏幕缩放', mod: 0x08, key: 0x27, label: 'Super+0' }
+    ]
+  },
+  {
+    category: '自定义',
+    items: [
+      { name: 'UOS AI',            mod: 0x08, key: 0x2c, label: 'Super+Space' },
+      { name: 'UOS AI Screenshot', mod: 0x05, key: 0x14, label: 'Ctrl+Alt+Q' },
+      { name: 'UOS AI Talk',       mod: 0x09, key: 0x2c, label: 'Ctrl+Super+Space' },
+      { name: 'AI随航/写作',       mod: 0x08, key: 0x15, label: 'Super+R' }
+    ]
+  }
+];
+
+export const DEEPIN_TERMINAL_SHORTCUTS = [
+  {
+    category: '终端',
+    items: [
+      { name: '复制',        mod: 0x03, key: 0x06, label: 'Ctrl+Shift+C' },
+      { name: '粘贴',        mod: 0x03, key: 0x19, label: 'Ctrl+Shift+V' },
+      { name: '查找',        mod: 0x05, key: 0x09, label: 'Ctrl+Alt+F' },
+      { name: '放大',        mod: 0x01, key: 0x2e, label: 'Ctrl+=' },
+      { name: '缩小',        mod: 0x01, key: 0x2d, label: 'Ctrl+-' },
+      { name: '默认大小',    mod: 0x01, key: 0x27, label: 'Ctrl+0' },
+      { name: '全选',        mod: 0x03, key: 0x04, label: 'Ctrl+Shift+A' }
+    ]
+  },
+  {
+    category: '标签页',
+    items: [
+      { name: '新建标签页',     mod: 0x03, key: 0x17, label: 'Ctrl+Shift+T' },
+      { name: '关闭标签页',     mod: 0x04, key: 0x1a, label: 'Alt+W' },
+      { name: '关闭其他标签页', mod: 0x03, key: 0x1a, label: 'Ctrl+Shift+W' },
+      { name: '上一个标签页',   mod: 0x03, key: 0x2b, label: 'Ctrl+Shift+Tab' },
+      { name: '下一个标签页',   mod: 0x01, key: 0x2b, label: 'Ctrl+Tab' },
+      { name: '纵向分屏',       mod: 0x03, key: 0x0d, label: 'Ctrl+Shift+J' },
+      { name: '横向分屏',       mod: 0x03, key: 0x0b, label: 'Ctrl+Shift+H' },
+      { name: '切换到标签 1',   mod: 0x03, key: 0x1e, label: 'Ctrl+Shift+1' },
+      { name: '切换到标签 2',   mod: 0x03, key: 0x1f, label: 'Ctrl+Shift+2' },
+      { name: '切换到标签 3',   mod: 0x03, key: 0x20, label: 'Ctrl+Shift+3' },
+      { name: '切换到标签 4',   mod: 0x03, key: 0x21, label: 'Ctrl+Shift+4' },
+      { name: '切换到标签 5',   mod: 0x03, key: 0x22, label: 'Ctrl+Shift+5' },
+      { name: '切换到标签 6',   mod: 0x03, key: 0x23, label: 'Ctrl+Shift+6' },
+      { name: '切换到标签 7',   mod: 0x03, key: 0x24, label: 'Ctrl+Shift+7' },
+      { name: '切换到标签 8',   mod: 0x03, key: 0x25, label: 'Ctrl+Shift+8' },
+      { name: '切换到标签 9',   mod: 0x03, key: 0x26, label: 'Ctrl+Shift+9' }
+    ]
+  },
+  {
+    category: '工作区',
+    items: [
+      { name: '选择上面的工作区', mod: 0x04, key: 0x52, label: 'Alt+Up' },
+      { name: '选择下面的工作区', mod: 0x04, key: 0x51, label: 'Alt+Down' },
+      { name: '选择左边的工作区', mod: 0x04, key: 0x50, label: 'Alt+Left' },
+      { name: '选择右边的工作区', mod: 0x04, key: 0x4f, label: 'Alt+Right' },
+      { name: '关闭工作区',       mod: 0x04, key: 0x14, label: 'Alt+Q' },
+      { name: '关闭其他工作区',   mod: 0x03, key: 0x14, label: 'Ctrl+Shift+Q' }
+    ]
+  },
+  {
+    category: '其他',
+    items: [
+      { name: '全屏',                     mod: 0x00, key: 0x44, label: 'F11' },
+      { name: '重命名标题',               mod: 0x00, key: 0x3b, label: 'F2' },
+      { name: '显示快捷键',               mod: 0x03, key: 0x38, label: 'Ctrl+Shift+?' },
+      { name: '自定义命令',               mod: 0x04, key: 0x49, label: 'Alt+Ins' },
+      { name: '远程管理',                 mod: 0x04, key: 0x4c, label: 'Alt+Del' },
+      { name: '光标焦点切换至“+”图标',    mod: 0x08, key: 0x2b, label: 'Super+Tab' }
+    ]
+  }
+];

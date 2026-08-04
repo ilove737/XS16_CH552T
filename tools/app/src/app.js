@@ -35,6 +35,7 @@ function init() {
   buildModCheckboxes();
   buildKeynameDatalist();
   buildSceneList();
+  initDeepinTabs();
   bindEvents();
   // 启动后端自动轮询（X11 检测 + 场景匹配 + 下发，全部在 Rust 线程中完成）
   ipc.startAutoPoll().catch((e) => console.warn('启动自动轮询失败:', e));
@@ -300,12 +301,20 @@ function renderOne(grid, layer) {
 
 function switchEditMode(mode) {
   const isMouse = mode === 'mouse';
+  const isDeepin = mode === 'deepin';
   $('mouseFieldset').hidden = !isMouse;
   $('modFieldset').hidden = true;
   $('keycodeFieldset').hidden = true;
-  $('kbd104Container').hidden = isMouse;
-  $('modalHint').hidden = isMouse;
-  if (isMouse && capture) { capture.stop(); capture = null; }
+  $('kbd104Container').hidden = isMouse || isDeepin;
+  $('modalHint').hidden = isMouse || isDeepin;
+  $('deepinFieldset').hidden = !isDeepin;
+  if (isDeepin) {
+    // 每次进入 deepin 模式都重置到「系统快捷键」标签并重建列表
+    document.querySelectorAll('.deepin-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.source === 'system'));
+    buildDeepinList('system');
+  }
+  if ((isMouse || isDeepin) && capture) { capture.stop(); capture = null; }
 }
 
 function openEdit(idx, layer) {
@@ -343,6 +352,61 @@ function openEdit(idx, layer) {
 function closeEdit() {
   $('modal').hidden = true;
   if (capture) { capture.stop(); capture = null; }
+}
+
+// ---- deepin 快捷键快速选择 ----
+function buildDeepinList(source) {
+  const root = $('deepinList');
+  root.innerHTML = '';
+  const data = source === 'terminal' ? km.DEEPIN_TERMINAL_SHORTCUTS : km.DEEPIN_SHORTCUTS;
+  for (const group of data) {
+    const cat = document.createElement('div');
+    cat.className = 'deepin-cat';
+    const title = document.createElement('div');
+    title.className = 'deepin-cat-title';
+    title.textContent = group.category;
+    cat.appendChild(title);
+
+    const items = document.createElement('div');
+    items.className = 'deepin-items';
+    for (const it of group.items) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'deepin-item';
+      row.dataset.mod = it.mod;
+      row.dataset.key = it.key;
+      const name = document.createElement('span');
+      name.className = 'deepin-name';
+      name.textContent = it.name;
+      const combo = document.createElement('span');
+      combo.className = 'deepin-combo';
+      combo.textContent = it.label;
+      row.append(name, combo);
+      row.addEventListener('click', () => {
+        document.querySelectorAll('.deepin-item.selected').forEach(el => el.classList.remove('selected'));
+        row.classList.add('selected');
+        applyModToCheckboxes(it.mod);
+        $('hexInput').value = '0x' + (it.key & 0xff).toString(16).padStart(2, '0');
+        $('nameInput').value = keyNameOf(it.key);
+        renderKeyboard104(it.key & 0xff);
+        setStatus(`已选择 deepin 快捷键：${it.name}（${it.label}），点击「确定」写入。`);
+      });
+      items.appendChild(row);
+    }
+    cat.appendChild(items);
+    root.appendChild(cat);
+  }
+}
+
+// deepin 系统 / 终端 子标签切换
+function initDeepinTabs() {
+  document.querySelectorAll('.deepin-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.deepin-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      buildDeepinList(tab.dataset.source);
+    });
+  });
 }
 
 // ---- 104 键盘图渲染 ----

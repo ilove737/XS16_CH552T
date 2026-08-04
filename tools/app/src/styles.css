@@ -327,6 +327,77 @@ main {
 .mouse-btn:hover { background: #eef; }
 .mouse-btn.active { background: #3498db; color: #fff; border-color: #2980b9; }
 
+/* ---- deepin 快捷键快速选择 ---- */
+.deepin-tip { font-size: 12px; color: #888; margin: 2px 0 8px; }
+.deepin-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.deepin-tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #c9def5;
+  background: #f7fbff;
+  color: #2c3e50;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.deepin-tab:hover { background: #eaf3fd; }
+.deepin-tab.active {
+  background: #3498db;
+  color: #fff;
+  border-color: #2980b9;
+}
+#deepinList {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.deepin-cat { margin-bottom: 12px; }
+.deepin-cat-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  background: #f3f5f8;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  position: sticky;
+  top: 0;
+}
+.deepin-items { display: flex; flex-direction: column; gap: 4px; }
+.deepin-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .12s, border-color .12s;
+}
+.deepin-item:hover { background: #f0f6ff; border-color: #c9def5; }
+.deepin-item.selected { background: #3498db; color: #fff; border-color: #2980b9; }
+.deepin-name { flex: 1; }
+.deepin-combo {
+  font-family: monospace;
+  font-size: 12px;
+  color: #2c3e50;
+  background: #eef1f5;
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.deepin-item.selected .deepin-combo { background: rgba(255,255,255,.25); color: #fff; }
+
 .statusbar {
   padding: 6px 16px;
   font-size: 12px;
