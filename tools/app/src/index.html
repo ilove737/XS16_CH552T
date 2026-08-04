@@ -24,6 +24,9 @@
     <button id="btnExportTxt">导出 .txt</button>
     <button id="btnExportBin">导出 .bin</button>
     <span class="sep"></span>
+    <button id="btnActiveApp" class="primary">刷新当前应用</button>
+    <span id="activeAppInfo" class="active-app-info" title="当前激活应用 (X11)">—</span>
+    <span class="sep"></span>
     <input type="file" id="fileInput" accept=".txt,.bin" hidden>
   </div>
 
@@ -39,6 +42,13 @@
       <div class="grid" id="grid"></div>
       <p class="grid-hint">点击任意按键进行编辑。每个按键 2 字节：[修饰符, 键码]。</p>
     </section>
+    <aside class="scene-panel">
+      <div class="scene-panel-title">
+        <span>场景列表</span>
+      </div>
+      <ul id="sceneList" class="scene-list"></ul>
+      <p class="hint" id="sceneHint">点击场景项切换编辑。各场景名取自该槽前 16 字节。</p>
+    </aside>
   </main>
 
   <div class="statusbar" id="statusbar">就绪</div>

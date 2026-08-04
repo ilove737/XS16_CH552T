@@ -8,12 +8,14 @@ const ROWS = 4;
 const COLS = 4;
 
 // ---- 全局状态 ----
+// 注意：业务逻辑（设备通信 / X11 检测 / 场景匹配 / 自动轮询 / 下发）全在后端。
+// 前端 state 仅持有「展示所需」的本地副本（data 用于网格渲染），以及 UI 交互状态。
 const state = {
   devices: [],                 // DeviceInfo[] (来自 Rust 后端)
-  deviceData: new Map(),       // path -> Uint8Array(64) 各键盘配置缓存
   currentDevice: null,         // DeviceInfo | null
-  currentLayer: 0,             // 0=mainKeyMap, 1=Fn0_keyMap
-  data: km.makeDefaultKeymap(),// 当前显示/编辑的 64 字节
+  currentLayer: 0,             // 0=主层, 1=Fn 层
+  scene: 0,                    // 当前编辑的场景槽（0~5）
+  data: km.makeDefaultKeymap(),// 当前显示/编辑的 480 字节（渲染用本地副本）
   editIdx: -1,
 };
 let capture = null;
@@ -31,8 +33,99 @@ function keyNameOf(code) {
 function init() {
   buildModCheckboxes();
   buildKeynameDatalist();
+  buildSceneList();
   bindEvents();
+  // 启动后端自动轮询（X11 检测 + 场景匹配 + 下发，全部在 Rust 线程中完成）
+  ipc.startAutoPoll().catch((e) => console.warn('启动自动轮询失败:', e));
+  // 当前应用栏：轻量轮询后端 get_poll_status 仅做展示，不下发
+  setInterval(refreshActiveAppInfo, 2000);
   setTimeout(() => onRefresh(), 100);
+}
+
+// 仅展示当前前台应用与已匹配场景（下发由后端自动完成）
+async function refreshActiveAppInfo() {
+  try {
+    const st = await ipc.getPollStatus();
+    const sceneName = st.matched_scene > 0 ? `场景${st.matched_scene}` : 'generic';
+    $('activeAppInfo').textContent =
+      st.app_name ? `${st.app_name} → ${sceneName}` : '—';
+  } catch (e) {
+    // 后端无 X11 等情况静默
+  }
+}
+
+/** 当前场景槽的显示名（优先应用名，否则 "槽N"） */
+function sceneLabel(scene) {
+  const name = km.unpackAppName(state.data, scene);
+  return name || (scene === 0 ? '主层' : `场景${scene}`);
+}
+
+/** 动态构建右侧场景列表（每项来自各槽前 16 字节应用名），点击切换编辑槽 */
+function buildSceneList() {
+  const ul = $('sceneList');
+  ul.innerHTML = '';
+  for (let s = 0; s < km.SCENE_MAX; s++) {
+    const li = document.createElement('li');
+    li.className = 'scene-item';
+    li.dataset.scene = String(s);
+
+    const idx = document.createElement('span');
+    idx.className = 'scene-idx';
+    idx.textContent = String(s);
+
+    const info = document.createElement('span');
+    info.className = 'scene-info';
+
+    // 场景名可编辑：输入框直接绑定该槽前 16 字节应用名
+    const nameInput = document.createElement('input');
+    nameInput.className = 'scene-name-input';
+    nameInput.value = km.unpackAppName(state.data, s);
+    nameInput.placeholder = `槽${s} · 未命名`;
+    nameInput.title = '编辑该场景应用名（支持 ; 分隔多个别名），点击「下发当前场景」时一并写入 Flash';
+    nameInput.spellcheck = false;
+    // 阻止点击输入框时冒泡触发 li 的场景切换
+    nameInput.addEventListener('pointerdown', (e) => e.stopPropagation());
+    nameInput.addEventListener('change', () => {
+      km.packAppName(state.data, s, nameInput.value.trim());
+      ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
+        console.warn('同步键位到后端失败:', e));
+      nameInput.value = km.unpackAppName(state.data, s);
+      setStatus(`场景槽 ${s} 应用名已更新为「${nameInput.value || '(空)'}」`);
+    });
+
+    const layers = document.createElement('span');
+    layers.className = 'scene-layers';
+    layers.textContent = '主层 / Fn 层';
+
+    info.append(nameInput, layers);
+    li.append(idx, info);
+    li.addEventListener('click', () => {
+      state.scene = s;
+      renderGrid();
+      highlightScene();
+      setStatus(`切换到场景槽 ${state.scene}（${sceneLabel(state.scene)}）`);
+    });
+    ul.append(li);
+  }
+  highlightScene();
+}
+
+/** 根据各槽应用名刷新场景列表的显示文本（读取设备后调用） */
+function refreshSceneList() {
+  const ul = $('sceneList');
+  for (let s = 0; s < km.SCENE_MAX; s++) {
+    const li = ul.querySelector(`.scene-item[data-scene="${s}"]`);
+    if (!li) continue;
+    const input = li.querySelector('.scene-name-input');
+    if (input) input.value = km.unpackAppName(state.data, s);
+  }
+}
+
+/** 高亮当前选中的场景项 */
+function highlightScene() {
+  document.querySelectorAll('.scene-item').forEach((li) => {
+    li.classList.toggle('active', parseInt(li.dataset.scene, 10) === state.scene);
+  });
 }
 
 function buildModCheckboxes() {
@@ -177,11 +270,11 @@ function refreshTree() {
     const ul = document.createElement('ul');
     const li0 = document.createElement('li');
     li0.className = 'tree-layer';
-    li0.textContent = 'mainKeyMap (主层)';
+    li0.textContent = '主层';
     li0.onclick = (ev) => { ev.stopPropagation(); selectDevice(dev, 0); };
     const li1 = document.createElement('li');
     li1.className = 'tree-layer';
-    li1.textContent = 'Fn0_keyMap (Fn层)';
+    li1.textContent = 'Fn 层';
     li1.onclick = (ev) => { ev.stopPropagation(); selectDevice(dev, 1); };
     ul.append(li0, li1);
     devLi.append(ul);
@@ -206,43 +299,35 @@ function highlightCurrent() {
 async function selectDevice(dev, layer) {
   const prevDev = state.currentDevice;
   const prevLayer = state.currentLayer;
-  // 保存上一设备编辑
-  if (prevDev && state.deviceData.has(prevDev.path)) {
-    state.deviceData.set(prevDev.path, new Uint8Array(state.data));
-  }
   state.currentDevice = dev;
   state.currentLayer = layer;
 
-  if (state.deviceData.has(dev.path)) {
-    state.data = new Uint8Array(state.deviceData.get(dev.path));
+  setStatus(`正在读取 ${ipc.deviceLabel(dev)}...`);
+  try {
+    const data = await ipc.readKeymap();
+    console.log(`[读取设备] ${ipc.deviceLabel(dev)} 读取到 ${data.length} 字节：`, data);
+    state.data = new Uint8Array(data);
     afterLoad();
-    setStatus(`已载入 ${ipc.deviceLabel(dev)} 的 ${layer ? 'Fn0' : '主'}层`);
-  } else {
-    setStatus(`正在读取 ${ipc.deviceLabel(dev)}...`);
-    try {
-      const data = await ipc.readKeymap(dev.path);
-      state.deviceData.set(dev.path, new Uint8Array(data));
-      state.data = new Uint8Array(data);
-      afterLoad();
-      setStatus(`已读取 ${ipc.deviceLabel(dev)}`);
-    } catch (e) {
-      state.currentDevice = prevDev;
-      state.currentLayer = prevLayer;
-      afterLoad();
-      setStatus('读取失败: ' + e.message + '（保持上一键盘显示）');
-    }
+    setStatus(`已读取 ${ipc.deviceLabel(dev)}`);
+  } catch (e) {
+    state.currentDevice = prevDev;
+    state.currentLayer = prevLayer;
+    afterLoad();
+    setStatus('读取失败: ' + e.message + '（保持上一键盘显示）');
   }
   highlightCurrent();
 }
 
 function afterLoad() {
+  refreshSceneList();
+  highlightScene();
   renderGrid();
 }
 
 // ---- 网格渲染 ----
 
 function keyDisplay(mod, key) {
-  if (mod === 0xff && key === 0x00) return { text: 'Fn0', cls: 'key-fn' };
+  if (mod === 0xff && key === 0x00) return { text: 'Fn', cls: 'key-fn' };
   if (km.isMouseAction(mod)) {
     const name = km.mouseShortName(key);
     return { text: '🖱' + (name ? '\n' + name : ''), cls: 'key-mouse' };
@@ -270,7 +355,7 @@ function renderGrid() {
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const idx = row * COLS + col;
-      const [mod, key] = km.getKey(state.data, state.currentLayer, idx);
+      const [mod, key] = km.getKeyAt(state.data, state.scene, state.currentLayer, idx);
       const btn = document.createElement('button');
       btn.className = 'key-btn';
       const disp = keyDisplay(mod, key);
@@ -297,10 +382,10 @@ function switchEditMode(mode) {
 
 function openEdit(idx) {
   state.editIdx = idx;
-  const [mod, key] = km.getKey(state.data, state.currentLayer, idx);
-  const layerName = state.currentLayer ? 'Fn0_keyMap' : 'mainKeyMap';
+  const [mod, key] = km.getKeyAt(state.data, state.scene, state.currentLayer, idx);
+  const layerName = state.currentLayer ? 'Fn层' : '主层';
   $('modalTitle').textContent =
-    `编辑键位 ${idx} (${layerName}, 行${Math.floor(idx / COLS)} 列${idx % COLS})`;
+    `编辑键位 ${idx} (槽${state.scene}·${sceneLabel(state.scene)} ${layerName}, 行${Math.floor(idx / COLS)} 列${idx % COLS})`;
 
   const isMouse = km.isMouseAction(mod);
   document.querySelector('input[name="editMode"][value="' + (isMouse ? 'mouse' : 'keyboard') + '"]').checked = true;
@@ -435,13 +520,12 @@ function collectKey() {
 function onOk() {
   const mod = collectMod();
   const key = collectKey();
-  km.setKey(state.data, state.currentLayer, state.editIdx, mod, key);
-  if (state.currentDevice) {
-    state.deviceData.set(state.currentDevice.path, new Uint8Array(state.data));
-  }
+  km.setKeyAt(state.data, state.scene, state.currentLayer, state.editIdx, mod, key);
+  ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
+    console.warn('同步键位到后端失败:', e));
   closeEdit();
   renderGrid();
-  setStatus(`已修改键位 ${state.editIdx}: mod=0x${mod.toString(16).padStart(2, '0')} key=0x${key.toString(16).padStart(2, '0')}`);
+  setStatus(`已修改键位 槽${state.scene}·${state.currentLayer ? 'Fn' : '主'}·${state.editIdx}: mod=0x${mod.toString(16).padStart(2, '0')} key=0x${key.toString(16).padStart(2, '0')}`);
 }
 
 function applyModToCheckboxes(mod) {
@@ -474,7 +558,7 @@ async function onWrite() {
   if (!state.currentDevice) { setStatus('请先连接并选择键盘'); return; }
   setStatus('正在写入设备...');
   try {
-    await ipc.writeKeymap(state.currentDevice.path, new Uint8Array(state.data));
+    await ipc.writeKeymap(new Uint8Array(state.data));
     setStatus('写入成功');
   } catch (e) {
     setStatus('写入失败: ' + e.message);
@@ -488,12 +572,16 @@ async function onRead() {
 
 function onDefault() {
   state.data = km.makeDefaultKeymap();
-  if (state.currentDevice) {
-    state.deviceData.set(state.currentDevice.path, new Uint8Array(state.data));
-  }
+  ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
+    console.warn('同步键位到后端失败:', e));
   afterLoad();
   setStatus('已恢复默认键位映射');
 }
+
+// ---- 应用场景切换 ----
+// 说明：自动下发场景的逻辑（X11 检测 + 场景匹配 + 下发）已全部移至后端
+// （src-tauri/src/lib.rs 的 poll_loop 线程）。前端仅负责展示当前应用与匹配结果，
+// 不再手动下发、不再调用 onSendScene。
 
 // ---- 文件导入导出 ----
 
@@ -514,9 +602,8 @@ $('fileInput').addEventListener('change', (e) => {
         data = km.readKeymapText(reader.result);
       }
       state.data = data;
-      if (state.currentDevice) {
-        state.deviceData.set(state.currentDevice.path, new Uint8Array(data));
-      }
+      ipc.setKeymap(new Uint8Array(data)).catch((e) =>
+        console.warn('同步键位到后端失败:', e));
       afterLoad();
       setStatus(`已导入: ${file.name}`);
     } catch (err) {
@@ -576,6 +663,7 @@ function bindEvents() {
   $('btnImport').onclick = onImport;
   $('btnExportTxt').onclick = exportTxt;
   $('btnExportBin').onclick = exportBin;
+  $('btnActiveApp').onclick = () => refreshActiveAppInfo();
   $('btnCancel').onclick = closeEdit;
   $('btnOk').onclick = onOk;
 

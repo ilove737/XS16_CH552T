@@ -1,58 +1,61 @@
-// ipc-hid.js
-// XS16_CH552T HID 通信层 - Tauri IPC 版
-// 通过 Tauri 的 invoke 调用 Rust 后端 hidapi，替代浏览器 WebHID。
+// Tauri IPC 封装：前端只负责调用后端命令，业务逻辑（设备通信 / X11 检测 /
+// 场景匹配 / 自动轮询 / 下发）全部在后端 src-tauri/src/lib.rs 完成。
 import { invoke } from '@tauri-apps/api/core';
 
-export const KEYMAP_SIZE = 64;
-
-// =========================================================================
-// 设备枚举
-// =========================================================================
-
-/** 枚举所有已连接的 XS16 键盘（VID=0x4C58, PID=0x5310） */
 export async function listDevices() {
   return await invoke('list_devices');
 }
 
-// =========================================================================
-// 设备打开 / 关闭
-// =========================================================================
-
-/** 打开设备（按路径） */
 export async function openDevice(path) {
   return await invoke('open_device', { path });
 }
 
-/** 关闭设备（按路径） */
 export async function closeDevice(path) {
   return await invoke('close_device', { path });
 }
 
-// =========================================================================
-// 键位映射读写
-// =========================================================================
-
-/** 读取键位映射，返回 Uint8Array(64) */
-export async function readKeymap(path) {
-  const arr = await invoke('read_keymap', { path });
-  return new Uint8Array(arr);
+export async function readKeymap() {
+  return await invoke('read_keymap');
 }
 
-/** 写入键位映射，data 为 Uint8Array(64) */
-export async function writeKeymap(path, data) {
-  return await invoke('write_keymap', { path, data: Array.from(data) });
+export async function writeKeymap(data) {
+  return await invoke('write_keymap', { data });
 }
 
-// =========================================================================
-// 辅助函数
-// =========================================================================
-
-/** 设备稳定标识（按路径，路径唯一） */
-export function deviceId(info, fallbackIndex = 0) {
-  return info.path || `device:${fallbackIndex}`;
+// 把前端编辑后的键位同步给后端真相源（不落盘，落盘由 writeKeymap 负责）
+export async function setKeymap(data) {
+  return await invoke('set_keymap', { data });
 }
 
-/** 设备显示名：优先 serialNumber，否则 productName */
-export function deviceLabel(info) {
-  return info.serial_number || info.product_name || 'XS16';
+// 获取后端真相源当前 480 字节，供前端渲染
+export async function getKeymap() {
+  return await invoke('get_keymap');
+}
+
+export async function sendScene(sceneId) {
+  return await invoke('send_scene', { sceneId });
+}
+
+export async function activeApp() {
+  return await invoke('active_app');
+}
+
+// 启动后端自动轮询（X11 检测 + 场景匹配 + 下发）
+export async function startAutoPoll() {
+  return await invoke('start_auto_poll');
+}
+
+// 停止后端自动轮询
+export async function stopAutoPoll() {
+  return await invoke('stop_auto_poll');
+}
+
+// 获取当前前台应用与已匹配场景，供前端"当前应用"栏展示（纯展示，不下发）
+export async function getPollStatus() {
+  return await invoke('get_poll_status');
+}
+
+// 纯展示辅助：把设备信息转成可读标签（不调用后端）
+export function deviceLabel(dev) {
+  return dev.product || dev.path || '键盘';
 }

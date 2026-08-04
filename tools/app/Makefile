@@ -4,13 +4,6 @@
 # 提供两类产物：
 #   1. web  前端 bundle（dist/bundle.js + index.html + styles.css）
 #   2. tauri 桌面应用安装包（src-tauri/target/release/bundle/）
-#
-# 常用命令：
-#   make            # 仅构建前端 bundle（等价 make web）
-#   make web        # 构建前端 bundle
-#   make app        # 构建桌面应用（含前端 bundle）
-#   make dev        # 启动开发模式（tauri dev）
-#   make clean      # 清理构建产物
 # =============================================================================
 
 # ---- 工具检测 ----
@@ -40,7 +33,7 @@ FRONT_SRC := $(SRC_DIR)/app.js \
 BUNDLE_DIR := $(TAURI_DIR)/target/release/bundle
 APP_BIN    := $(TAURI_DIR)/target/release/xs16keymap
 
-.PHONY: all web app dev run clean sysctl help
+.PHONY: all web app dev run clean help
 
 all: web
 
@@ -62,12 +55,12 @@ $(CSS_OUT): $(SRC_DIR)/styles.css
 # ---- 桌面应用构建（Tauri 安装包） ----
 app: web
 	@echo ">> 构建 Tauri 桌面应用安装包..."
-	cd $(TAURI_DIR) && $(CARGO) tauri build
+	cd $(TAURI_DIR) && $(CARGO) build --release
 
 # ---- 开发模式 ----
 dev:
 	@echo ">> 启动 Tauri 开发模式..."
-	cd $(TAURI_DIR) && $(CARGO) tauri dev
+	cd $(TAURI_DIR) && $(CARGO) dev
 
 # ---- 运行已构建的产物 ----
 # 若 release 二进制不存在，先编译再运行。
@@ -79,24 +72,14 @@ run: web $(APP_BIN)
 $(APP_BIN): $(BUNDLE_OUT) $(HTML_OUT) $(CSS_OUT)
 	@echo ">> 编译 Tauri release 二进制..."
 	cd $(TAURI_DIR) && $(CARGO) build --release
+	@touch $@
 
 # ---- 清理 ----
 clean:
 	@echo ">> 清理 dist/ 构建产物"
-	rm -rf $(DIST_DIR)/bundle.js $(DIST_DIR)/index.html $(DIST_DIR)/styles.css
+	rm -rf $(DIST_DIR)
 	@echo ">> 清理 Rust target/ 构建产物"
 	rm -rf $(TAURI_DIR)/target
-
-# ---- 修复 "Too many open files"（inotify 限制） ----
-# 当 Linux 桌面环境占用大量 inotify 实例时，max_user_instances=128 会被耗尽，
-# tauri-cli 的文件监听创建 inotify 实例会失败并报 "Too many open files" (code 24)。
-# 该目标需 root 权限，会提示输入 sudo 密码；并写入 sysctl 使重启后仍生效。
-sysctl:
-	@echo ">> 当前 inotify 限制: $$(cat /proc/sys/fs/inotify/max_user_instances)"
-	@echo ">> 当前使用: $$(find /proc/*/fd -lname 'anon_inode:inotify' 2>/dev/null | wc -l)"
-	@sudo sysctl -w fs.inotify.max_user_instances=2048
-	@echo "fs.inotify.max_user_instances=2048" | sudo tee /etc/sysctl.d/99-inotify.conf > /dev/null
-	@echo ">> 已修复（本次 + 重启持久化）"
 
 # ---- 帮助 ----
 help:
@@ -106,6 +89,5 @@ help:
 	@echo "  make app     构建桌面应用安装包（含前端 bundle）"
 	@echo "  make dev     启动 Tauri 开发模式"
 	@echo "  make run     编译并运行 release 产物（若已编译则直接运行）"
-	@echo "  make sysctl  修复 'Too many open files'（需 sudo，抬高 inotify 限制）"
 	@echo "  make clean   清理所有构建产物"
 	@echo "  make help    显示本帮助"

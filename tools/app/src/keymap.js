@@ -1,14 +1,27 @@
 // keymap.js
 // XS16_CH552T 键位映射核心逻辑（移植自 tools/set_keymap.py）
 // 纯前端版本：键码表、修饰符、解析/格式化、默认布局、显示辅助。
+//
+// 键位映射布局（与固件 src/keyMap.h 的 sceneMapTable 保持一致）：
+//   总共 SCENE_MAX(6) 个场景槽，每槽 80 字节：
+//     [0..15]  应用名称（ASCII，不足补 0，最多 15 字符）
+//     [16..47] 主层键位（16 键 × 2）
+//     [48..79] 该场景专属 Fn 层键位（16 键 × 2）
+//   KEYMAP_SIZE = 6 × 80 = 480 字节。
 
 // USB HID 设备标识与键位数据布局
 export const VID = 0x4C58;
 export const PID = 0x5310;
 export const REPORT_ID = 0x01;     // 厂商 Feature Report ID
-export const KEYMAP_SIZE = 64;     // mainKeyMap(32) + Fn0_keyMap(32)
+export const SCENE_MAX = 6;        // 场景槽位总数（编号 0~5）
+export const NAME_SIZE = 16;       // 每槽应用名区长度（字节）
+export const KEY_BYTES = 32;       // 每层键位长度（16 键 × 2）
+export const SCENE_MAP_SIZE = 80;  // 每槽总长度 = NAME_SIZE + KEY_BYTES*2
+export const KEYMAP_SIZE = SCENE_MAX * SCENE_MAP_SIZE; // 480
 export const KEY_ENTRIES = 16;     // 每层 16 键
-export const LAYER_SIZE = 32;      // 每层 32 字节（16 键 * 2）
+export const LAYER_SIZE = KEY_BYTES; // 每层 32 字节（16 键 * 2）
+export const MAP_MAIN_OFF = NAME_SIZE;           // 16：主层键位起始
+export const MAP_FN_OFF = NAME_SIZE + KEY_BYTES; // 48：Fn 层键位起始
 
 // =========================================================================
 // USB HID 键码表（Usage ID）
@@ -192,63 +205,162 @@ export function mouseShortName(code) {
   return MOUSE_SHORT_NAMES[code] || '';
 }
 
-// 默认键位（main + Fn0），返回 Uint8Array(64)
-// 与固件 src/keyMap.h 布局保持一致（含鼠标动作键位）
+// =========================================================================
+// 布局工具（场景槽 + 层）
+// =========================================================================
+
+// 读取指定场景槽的应用名（ASCII，遇 0 截断），返回字符串
+export function unpackAppName(data, scene) {
+  const base = scene * SCENE_MAP_SIZE;
+  let s = '';
+  for (let i = 0; i < NAME_SIZE; i++) {
+    const c = data[base + i];
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s;
+}
+
+// 写入指定场景槽的应用名（ASCII，不足补 0，最多 NAME_SIZE-1 字符）
+export function packAppName(data, scene, name) {
+  const base = scene * SCENE_MAP_SIZE;
+  const str = String(name == null ? '' : name).slice(0, NAME_SIZE - 1);
+  for (let i = 0; i < NAME_SIZE; i++) {
+    data[base + i] = i < str.length ? str.charCodeAt(i) : 0;
+  }
+}
+
+// 读取键位 [mod,key]。scene=场景槽，layer=0主层/1Fn，idx=键索引(0~15)
+export function getKeyAt(data, scene, layer, idx) {
+  const off = scene * SCENE_MAP_SIZE + (layer ? MAP_FN_OFF : MAP_MAIN_OFF) + idx * 2;
+  return [data[off], data[off + 1]];
+}
+
+export function setKeyAt(data, scene, layer, idx, mod, key) {
+  const off = scene * SCENE_MAP_SIZE + (layer ? MAP_FN_OFF : MAP_MAIN_OFF) + idx * 2;
+  data[off] = mod & 0xff;
+  data[off + 1] = key & 0xff;
+}
+
+// 兼容旧签名：默认编辑槽 0（主层 generic）
+export function getKey(data, layer, idx) {
+  return getKeyAt(data, 0, layer, idx);
+}
+
+export function setKey(data, layer, idx, mod, key) {
+  setKeyAt(data, 0, layer, idx, mod, key);
+}
+
+// 返回某场景槽某层的 32 字节视图
+export function getLayerData(data, scene, layer) {
+  const off = scene * SCENE_MAP_SIZE + (layer ? MAP_FN_OFF : MAP_MAIN_OFF);
+  return data.slice(off, off + KEY_BYTES);
+}
+
+export function setLayerData(data, scene, layer, layerData) {
+  const off = scene * SCENE_MAP_SIZE + (layer ? MAP_FN_OFF : MAP_MAIN_OFF);
+  data.set(layerData.subarray(0, KEY_BYTES), off);
+}
+
+// =========================================================================
+// 默认键位（6 槽，与固件 src/keyMap.h sceneMapTable 保持一致）
+// =========================================================================
+
+// 通用主层（deepin 系统快捷键）32 字节：[mod,key]×16
+const DEFAULT_MAIN = [
+  [0x05, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // 终端/启动器/截图/录屏
+  [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],  // Alt+Tab/Super+D/Super+E/Super+L
+  [0x04, 0x3d], [0x08, 0x16], [0x08, 0x52], [0x08, 0x51],  // F4/工作区/↑/↓
+  [0xff, 0x00], [0x05, 0x29], [0x05, 0x4c], [0x08, 0x13],  // Fn/监视器/关机/显示器
+];
+
+// 终端主层（deepin-term）
+const DEFAULT_MAIN_TERMINAL = [
+  [0x03, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // Ctrl+Shift+T/启动器/截图/录屏
+  [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],
+  [0x01, 0x3d], [0x08, 0x52], [0x01, 0x0f], [0x03, 0x06],  // Ctrl+F4/↑/Ctrl+L/Ctrl+Shift+C
+  [0xff, 0x00], [0x03, 0x11], [0x03, 0x19], [0x01, 0x2e],  // Fn/新窗口/粘贴/放大
+];
+
+// 浏览器主层（firefox）
+const DEFAULT_MAIN_BROWSER = [
+  [0x01, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // Ctrl+T/启动器/截图/录屏
+  [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],
+  [0x01, 0x1a], [0x03, 0x11], [0x01, 0x15], [0x04, 0x50],  // Ctrl+W/新窗口/刷新/Alt+←
+  [0xff, 0x00], [0x01, 0x0f], [0x03, 0x17], [0x01, 0x07],  // Fn/地址栏/恢复/书签
+];
+
+// 通用 Fn 层（所有槽共用）32 字节：[mod,key]×16
+const DEFAULT_FN = [
+  [0, 0x29], [0, 0x3a], [0, 0x3b], [0, 0x3c],
+  [0, 0x2b], [0, 0x44], [0, 0x45], [0, 0x08],
+  [0, 0x39], [0xfe, 1], [0xfe, 4], [0xfe, 2],
+  [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],
+];
+
+// 将 [mod,key] 数组铺平为 32 字节
+function flatten(entries) {
+  const a = new Uint8Array(KEY_BYTES);
+  for (let i = 0; i < entries.length; i++) {
+    a[i * 2] = entries[i][0] & 0xff;
+    a[i * 2 + 1] = entries[i][1] & 0xff;
+  }
+  return a;
+}
+
+// 生成默认键位映射 Uint8Array(480)：6 槽 × 80 字节
 export function makeDefaultKeymap() {
-  // 主层 = deepin 系统快捷键：
-  //   Ctrl+Alt+T 终端, Super 启动器, Ctrl+Alt+A 截图, Ctrl+Alt+R 录屏
-  //   Alt+Tab 切换窗口, Super+D 桌面, Super+E 文件管理器, Super+L 锁屏
-  //   Alt+F4 关闭窗口, Super+S 工作区, Super+↑ 最大化, Super+↓ 恢复
-  //   Fn, Ctrl+Alt+Esc 系统监视器, Ctrl+Alt+Del 关机菜单, Super+P 显示器
-  const main = [
-    [0x05, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],
-    [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],
-    [0x04, 0x3d], [0x08, 0x16], [0x08, 0x52], [0x08, 0x51],
-    [0xff, 0x00], [0x05, 0x29], [0x05, 0x4c], [0x08, 0x13],
-  ];
-  const fn0 = [
-    [0, 0x29], [0, 0x3a], [0, 0x3b], [0, 0x3c],
-    [0, 0x2b], [0, 0x44], [0, 0x45], [0, 0x08],
-    [0, 0x39], [0xfe, 1], [0xfe, 4], [0xfe, 2],
-    [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],
-  ];
   const raw = new Uint8Array(KEYMAP_SIZE);
-  let off = 0;
-  for (const [m, k] of main.concat(fn0)) {
-    raw[off++] = m & 0xff;
-    raw[off++] = k & 0xff;
+  const mains = [DEFAULT_MAIN, DEFAULT_MAIN_TERMINAL, DEFAULT_MAIN_BROWSER,
+                 DEFAULT_MAIN, DEFAULT_MAIN, DEFAULT_MAIN];
+  const names = ['generic', 'deepin-term', 'firefox', '', '', ''];
+  for (let s = 0; s < SCENE_MAX; s++) {
+    packAppName(raw, s, names[s]);
+    raw.set(flatten(mains[s]), s * SCENE_MAP_SIZE + MAP_MAIN_OFF);
+    raw.set(flatten(DEFAULT_FN), s * SCENE_MAP_SIZE + MAP_FN_OFF);
   }
   return raw;
 }
 
-// 解析文本映射文件 → Uint8Array(64)。格式: 索引 修饰符 键码 [# 注释]
-// 索引 0-15 为 mainKeyMap，16-31 为 Fn0_keyMap。
+// =========================================================================
+// 文本映射文件读写（格式：槽.层.索引 修饰符 键码）
+// 兼容旧格式：索引 修饰符 键码（索引 0-15 主层、16-31 Fn，映射到槽 0）
+// =========================================================================
+
+// 解析文本映射文件 → Uint8Array(480)
 export function readKeymapText(text) {
-  const entries = {};
+  const raw = makeDefaultKeymap();
   const lines = text.split(/\r?\n/);
   lines.forEach((line, lineno) => {
     line = line.trim();
     if (!line || line.startsWith('#')) return;
     const parts = line.split('#')[0].trim().split(/\s+/);
     if (parts.length < 3) {
-      throw new Error(`格式错误 行 ${lineno + 1}: 需要 "索引 修饰符 键码"`);
+      throw new Error(`格式错误 行 ${lineno + 1}: 需要 "槽.层.索引 修饰符 键码"`);
     }
-    const idx = parseInt(parts[0], 0);
-    if (isNaN(idx) || idx < 0 || idx >= KEY_ENTRIES * 2) {
+    // 解析索引段：新格式 "槽.层.索引" 或旧格式纯数字（映射槽0）
+    let scene = 0, layer = 0, idx = 0;
+    const seg = parts[0].split('.');
+    if (seg.length === 3) {
+      scene = parseInt(seg[0], 10);
+      layer = parseInt(seg[1], 10);
+      idx = parseInt(seg[2], 10);
+    } else {
+      // 旧格式：0-15 主层，16-31 Fn
+      const v = parseInt(parts[0], 10);
+      idx = v % KEY_ENTRIES;
+      layer = v >= KEY_ENTRIES ? 1 : 0;
+    }
+    if (scene < 0 || scene >= SCENE_MAX || (layer !== 0 && layer !== 1) ||
+        idx < 0 || idx >= KEY_ENTRIES) {
       throw new Error(`索引越界 行 ${lineno + 1}: ${parts[0]}`);
     }
     const mod = parseMod(parts[1]);
     if (mod === null) throw new Error(`修饰符格式错误 行 ${lineno + 1}: ${parts[1]}`);
     const key = parseKey(parts[2]);
     if (key === null) throw new Error(`键码格式错误 行 ${lineno + 1}: ${parts[2]}`);
-    entries[idx] = [mod & 0xff, key & 0xff];
+    setKeyAt(raw, scene, layer, idx, mod & 0xff, key & 0xff);
   });
-  const raw = new Uint8Array(KEYMAP_SIZE);
-  for (let i = 0; i < KEY_ENTRIES * 2; i++) {
-    const [m, k] = entries[i] || [0, 0];
-    raw[i * 2] = m;
-    raw[i * 2 + 1] = k;
-  }
   return raw;
 }
 
@@ -277,79 +389,32 @@ function formatKeyCell(mod, key) {
   return shortName(key) || keycodeName(key);
 }
 
-// 生成文本映射文件（矩阵排布格式 + 可导入旧格式）
+// 生成文本映射文件（多槽，格式：槽.层.索引 修饰符 键码）
 export function formatKeymapText(data) {
-  const main = data.slice(0, LAYER_SIZE);
-  const fn0 = data.slice(LAYER_SIZE);
   let out = '';
-  out += '# XS16_CH552T 键位映射配置文件\n\n';
+  out += '# XS16_CH552T 键位映射配置文件（6 槽，每槽 80B = 16 应用名 + 32 主层 + 32 Fn）\n\n';
   out += '# 修饰符: 0=无, 1=LCTRL, 2=LSHIFT, 4=LALT, 8=LMETA, 0x10=RCTRL, 0x20=RSHIFT, 0x40=RALT, 0x80=RMETA\n';
-  out += '# 0xFE修饰符 = 鼠标动作, 0xFF修饰符+0x00键码 = Fn切换键\n\n';
+  out += '# 0xFE修饰符 = 鼠标动作, 0xFF修饰符+0x00键码 = Fn切换键\n';
+  out += '# 键位行格式: 槽.层.索引 修饰符 键码  （槽0-5，层0主层/1Fn，索引0-15）\n\n';
 
-  for (const [layerName, layerData] of [['mainKeyMap', main], ['Fn0_keyMap', fn0]]) {
-    out += `# ===== ${layerName} =====\n`;
-    for (let row = 0; row < 4; row++) {
-      const cells = [];
-      for (let col = 0; col < 4; col++) {
-        const idx = row * 4 + col;
-        const m = layerData[idx * 2];
-        const k = layerData[idx * 2 + 1];
-        cells.push(formatKeyCell(m, k).padEnd(12, ' '));
+  for (let s = 0; s < SCENE_MAX; s++) {
+    const name = unpackAppName(data, s) || '(未命名)';
+    out += `# ===== 槽 ${s}（应用名: ${name}） =====\n`;
+    for (const layer of [0, 1]) {
+      const layerName = layer ? 'Fn层' : '主层';
+      out += `# --- ${layerName} ---\n`;
+      for (let i = 0; i < KEY_ENTRIES; i++) {
+        const [m, k] = getKeyAt(data, s, layer, i);
+        out += `${s}.${layer}.${String(i).padStart(2, ' ')}    0x${m.toString(16).padStart(2, '0')}   0x${k.toString(16).padStart(2, '0')}  # ${modName(m)}, ${m === 0xfe ? (MOUSE_LABELS[k] || '?') : (shortName(k) || keycodeName(k))}\n`;
       }
-      out += `# 行${row}:  ${cells.join('')}\n`;
+      out += '\n';
     }
-    out += '\n';
-  }
-
-  // 旧格式（可导入）
-  out += '# ===== 可导入格式（索引 修饰符 键码） =====\n';
-  out += '# ===== mainKeyMap =====\n';
-  for (let i = 0; i < KEY_ENTRIES; i++) {
-    const m = main[i * 2];
-    const k = main[i * 2 + 1];
-    out += `${String(i).padStart(2, ' ')}    0x${m.toString(16).padStart(2, '0')}   0x${k.toString(16).padStart(2, '0')}  # ${modName(m)}, ${m === 0xfe ? (MOUSE_LABELS[k] || '?') : (shortName(k) || keycodeName(k))}\n`;
-  }
-  out += '\n# ===== Fn0_keyMap =====\n';
-  for (let i = 0; i < KEY_ENTRIES; i++) {
-    const m = fn0[i * 2];
-    const k = fn0[i * 2 + 1];
-    out += `${String(i + KEY_ENTRIES).padStart(2, ' ')}    0x${m.toString(16).padStart(2, '0')}   0x${k.toString(16).padStart(2, '0')}  # ${modName(m)}, ${m === 0xfe ? (MOUSE_LABELS[k] || '?') : (shortName(k) || keycodeName(k))}\n`;
   }
   return out;
 }
 
-
-
-// 层 → 该层 80 字节视图
-export function getLayerData(data, layer) {
-  const off = layer * LAYER_SIZE;
-  return data.slice(off, off + LAYER_SIZE);
-}
-
-export function setLayerData(data, layer, layerData) {
-  const off = layer * LAYER_SIZE;
-  data.set(layerData.subarray(0, LAYER_SIZE), off);
-}
-
-export function getKey(data, layer, idx) {
-  const off = layer * LAYER_SIZE + idx * 2;
-  return [data[off], data[off + 1]];
-}
-
-export function setKey(data, layer, idx, mod, key) {
-  const off = layer * LAYER_SIZE + idx * 2;
-  data[off] = mod & 0xff;
-  data[off + 1] = key & 0xff;
-}
-
 // =========================================================================
 // 标准 ANSI 104 键键盘布局（基于 keyboard-layout-editor 的 ANSI 104 预设）
-// 每个键位: [col, span, keycode, 显示名, 行高]
-//   col   = 起始列（累积 x 坐标，0-indexed）
-//   span  = 占据列数
-//   keycode = HID 键码
-//   显示名  = 键面文字
-//   行高   = 可选，默认 1（KLE 的 h 参数，如小键盘 + 和 Enter 为 2）
 // =========================================================================
 export const KEYBOARD_104 = [
   // 行 0: 功能键行
