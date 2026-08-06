@@ -8,6 +8,20 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 const ROWS = 4;
 const COLS = 4;
 
+// 6 个场景预设主题色（槽 0~5）：匹配到快捷键的键帽用场景色做背景
+const SCENE_COLORS = [
+  '#3d9bd9', // 槽0 蓝
+  '#d9567a', // 槽1 玫红
+  '#8e7cc3', // 槽2 紫
+  '#5fa86a', // 槽3 绿
+  '#d98a3d', // 槽4 橙
+  '#7f8c9b', // 槽5 灰蓝
+];
+
+// 系统全局热键（任何场景匹配到都算）用 deepin 蓝标识，不跟随场景色
+const SYSKEY_COLOR = '#2980b9';        // 外框深蓝
+const SYSKEY_COLOR_LIGHT = '#3498db';  // 顶面主蓝（与白混合）
+
 // ---- 全局状态 ----
 // 注意：业务逻辑（设备通信 / X11 检测 / 场景匹配 / 自动轮询 / 下发）全在后端。
 // 前端 state 仅持有「展示所需」的本地副本（data 用于网格渲染），以及 UI 交互状态。
@@ -79,6 +93,7 @@ function buildSceneList() {
     const li = document.createElement('li');
     li.className = 'scene-item';
     li.dataset.scene = String(s);
+    li.style.setProperty('--scene-color', SCENE_COLORS[s] || '#ccc');
 
     const idx = document.createElement('span');
     idx.className = 'scene-idx';
@@ -254,7 +269,10 @@ function afterLoad() {
 
 // ---- 网格渲染 ----
 
-function keyDisplay(mod, key) {
+function keyDisplay(mod, key, friendly, matchedSource) {
+  if (friendly) {
+    return { text: friendly.name, cls: matchedSource === 'system' ? 'key-name key-sys' : 'key-name' };
+  }
   if (mod === 0xff && key === 0x00) return { text: 'Fn', cls: 'key-fn' };
   if (km.isMouseAction(mod)) {
     const name = km.mouseShortName(key);
@@ -284,16 +302,30 @@ function renderGrids() {
 
 function renderOne(grid, layer) {
   grid.innerHTML = '';
+  grid.style.setProperty('--scene-color', SCENE_COLORS[state.scene] || '#ccc');
+  grid.style.setProperty('--syskey-color', SYSKEY_COLOR);
+  grid.style.setProperty('--syskey-color-light', SYSKEY_COLOR_LIGHT);
+  const appName = km.unpackAppName(state.data, state.scene);
+  const isTerminal = appName === 'deepin-terminal';
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const idx = row * COLS + col;
       const [mod, key] = km.getKeyAt(state.data, state.scene, layer, idx);
+      // 先匹配当前场景专属表（仅 deepin-terminal），未命中再兜底系统全局热键
+      let friendly = isTerminal ? km.lookupFriendlyName(mod, key, 'deepin-terminal') : null;
+      let matchedSource = friendly ? 'app' : null;
+      if (!friendly) {
+        friendly = km.lookupFriendlyName(mod, key, 'system');
+        if (friendly) matchedSource = 'system';
+      }
       const btn = document.createElement('button');
       btn.className = 'key-btn';
-      const disp = keyDisplay(mod, key);
-      btn.classList.add(disp.cls);
+      const disp = keyDisplay(mod, key, friendly, matchedSource);
+      btn.classList.add(...disp.cls.split(' '));
       btn.textContent = disp.text;
-      btn.title = `索引 ${idx} (行${row} 列${col})  ${layer ? 'Fn层' : '主层'}  修饰符 0x${mod.toString(16).padStart(2, '0')} 键码 0x${key.toString(16).padStart(2, '0')}`;
+      btn.title = friendly
+        ? `${friendly.name}（${km.comboString(mod, key, friendly)}）`
+        : km.comboString(mod, key, null);
       btn.onclick = () => openEdit(idx, layer);
       grid.append(btn);
     }

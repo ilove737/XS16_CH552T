@@ -171,15 +171,15 @@ main {
   flex: 0 0 26px;
   height: 26px;
   border-radius: 50%;
-  background: #ecf0f1;
-  color: #555;
+  background: var(--scene-color, #ecf0f1);
+  color: #fff;
   font-weight: 700;
   font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.scene-item.active .scene-idx { background: #2980b9; color: #fff; }
+.scene-item.active .scene-idx { box-shadow: 0 0 0 3px rgba(0,0,0,.18); }
 /* 外部激活场景：在场景项右上角显示绿色原点，仅提示，不选中 */
 .scene-item.active-poll { position: relative; }
 .scene-item.active-poll::after {
@@ -293,6 +293,17 @@ main {
 .key-btn.key-none::before { background: #ddd; }
 .key-btn.key-none::after  { background: #eee; }
 .key-btn.key-none { color: #999; }
+.key-btn.key-name::before { background: var(--scene-color, #d6c8f0); }
+.key-btn.key-name::after  { background: color-mix(in srgb, var(--scene-color, #d6c8f0) 42%, #fff); }
+/* 系统全局热键：deepin 蓝，不跟随场景色 */
+.key-btn.key-sys::before { background: var(--syskey-color, #2980b9); }
+.key-btn.key-sys::after  { background: color-mix(in srgb, var(--syskey-color-light, #3498db) 38%, #fff); }
+.key-btn.key-name {
+  font-size: 13px;
+  line-height: 1.15;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 .grid-hint { font-size: 12px; color: #999; margin-top: 12px; }
 
 .mouse-group {

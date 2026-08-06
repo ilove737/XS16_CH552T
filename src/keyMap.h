@@ -59,7 +59,7 @@ UINT8C __at(0x3600) sceneMapTable[SCENE_MAX][SCENE_MAP_SIZE] = {
         0, KEY_CAPSLOCK, 0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
-    // ---- 槽 1：场景 1（编号 1，应用名 deepin-term，终端定制键位） ----
+    // ---- 槽 1：场景 1（编号 1，应用名 deepin-terminal，终端定制键位） ----
     {
         /* 应用名 0..15 */
         'd','e','e','p','i','n','-','t','e','r','m', 'i','n','a','l',0,

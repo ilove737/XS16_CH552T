@@ -274,7 +274,7 @@ const DEFAULT_MAIN = [
   [0xff, 0x00], [0x05, 0x29], [0x05, 0x4c], [0x08, 0x13],  // Fn/监视器/关机/显示器
 ];
 
-// 终端主层（deepin-term）
+// 终端主层（deepin-terminal）
 const DEFAULT_MAIN_TERMINAL = [
   [0x03, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // Ctrl+Shift+T/启动器/截图/录屏
   [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],
@@ -313,7 +313,7 @@ export function makeDefaultKeymap() {
   const raw = new Uint8Array(KEYMAP_SIZE);
   const mains = [DEFAULT_MAIN, DEFAULT_MAIN_TERMINAL, DEFAULT_MAIN_BROWSER,
                  DEFAULT_MAIN, DEFAULT_MAIN, DEFAULT_MAIN];
-  const names = ['generic', 'deepin-term', 'firefox', '', '', ''];
+  const names = ['generic', 'deepin-terminal', 'firefox', '', '', ''];
   for (let s = 0; s < SCENE_MAX; s++) {
     packAppName(raw, s, names[s]);
     raw.set(flatten(mains[s]), s * SCENE_MAP_SIZE + MAP_MAIN_OFF);
@@ -617,3 +617,23 @@ export const DEEPIN_TERMINAL_SHORTCUTS = [
     ]
   }
 ];
+
+// 按 (mod,key) 查询 deepin 可读快捷键条目；source='terminal' 用终端表，否则系统表
+export function lookupFriendlyName(mod, key, source) {
+  const data = source === 'deepin-terminal' ? DEEPIN_TERMINAL_SHORTCUTS : DEEPIN_SHORTCUTS;
+  for (const group of data) {
+    for (const it of group.items) {
+      if (it.mod === mod && it.key === key) return it;
+    }
+  }
+  return null;
+}
+
+// 组合键内容串（用于鼠标悬浮）：优先用 label，否则回退拼接
+export function comboString(mod, key, item) {
+  if (item && item.label) return item.label;
+  if (isMouseAction(mod)) return mouseShortName(key) || '鼠标';
+  const prefix = modName(mod);
+  const k = mod === 0xff && key === 0x00 ? 'Fn' : (shortName(key) || keycodeName(key));
+  return prefix === '0' || prefix === 'Fn' ? k : `${prefix}+${k}`;
+}
