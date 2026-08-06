@@ -240,7 +240,15 @@ fn active_app_impl() -> Result<ActiveApp, String> {
     let active = *windows.first().unwrap_or(&0);
 
     if active == 0 {
-        return Err("no active window".into());
+        // 锁屏 / 无前台窗口时 _NET_ACTIVE_WINDOW 为空，属正常现象，
+        // 语义降级为“当前无前台应用”，返回空 ActiveApp 而非报错刷屏。
+        // 真正的 X11 连接/读取错误仍以上面各 ? 的 Err 形式抛出。
+        return Ok(ActiveApp {
+            app_name: String::new(),
+            title: String::new(),
+            pid: 0,
+            self_pid: std::process::id(),
+        });
     }
 
     // name = WM_CLASS 实例名（第一个字符串）。WM_CLASS 形如 "instance\0class\0"。
@@ -325,13 +333,8 @@ fn active_app(state: State<AppState>) -> Result<ActiveApp, String> {
     let app = active_app_impl()?;
     let mut last = state.last_active_app.lock().unwrap();
     if *last != app.app_name {
-        println!(
-            "{} 当前激活应用: name={} pid={} title=\"{}\"",
-            log_prefix(),
-            app.app_name,
-            app.pid,
-            app.title
-        );
+        println!("{} [active_app] app={} pid={} title=\"{}\"",
+            log_prefix(), app.app_name, app.pid, app.title);
         *last = app.app_name.clone();
     }
     Ok(app)
@@ -398,20 +401,15 @@ fn poll_loop(shared: std::sync::Arc<PollShared>) {
         let app = match active_app_impl() {
             Ok(a) => a,
             Err(e) => {
-                println!("{} [auto_poll] active_app failed: {}", log_prefix(), e);
+                println!("{} [poll_loop] active_app failed: {}", log_prefix(), e);
                 continue;
             }
         };
         // 激活应用（name）变化时打印一行，避免每秒刷屏
         let mut last_app = shared.last_app.lock().unwrap();
         if *last_app != app.app_name {
-            println!(
-                "{} 当前激活应用: name={} pid={} title=\"{}\"",
-                log_prefix(),
-                app.app_name,
-                app.pid,
-                app.title
-            );
+            println!("{} [poll_loop] app={} pid={} title=\"{}\"",
+                log_prefix(), app.app_name, app.pid, app.title);
             *last_app = app.app_name.clone();
         }
         let km = shared.keymap.lock().unwrap().clone();
@@ -421,13 +419,9 @@ fn poll_loop(shared: std::sync::Arc<PollShared>) {
         if scene != *last {
             // 变化才发（去重）：命中下发场景号，未命中下发 0(generic)，避免每秒重复下发刷屏
             let _ = send_scene_impl(scene as u8);
-            println!(
-                "{} [auto_poll] app={} -> scene={} ({})",
-                log_prefix(),
-                app.app_name,
-                scene,
-                if scene == 0 { "generic" } else { "matched" }
-            );
+            println!("{} [poll_loop] app={} -> scene={} ({})",
+                log_prefix(), app.app_name, scene,
+                if scene == 0 { "generic" } else { "matched" });
             *last = scene;
         }
     }
@@ -443,7 +437,6 @@ fn start_auto_poll(state: State<AppState>) -> Result<(), String> {
     let sh = std::sync::Arc::clone(&state.poll);
     let h = thread::spawn(move || poll_loop(sh));
     *handle = Some(h);
-    println!("{} [auto_poll] started", log_prefix());
     Ok(())
 }
 
@@ -457,7 +450,6 @@ fn stop_auto_poll(state: State<AppState>) -> Result<(), String> {
     if let Some(h) = handle.take() {
         let _ = h.join();
     }
-    println!("{} [auto_poll] stopped", log_prefix());
     Ok(())
 }
 
@@ -660,5 +652,4 @@ fn stop_poll_on_exit(app: &tauri::AppHandle) {
     if let Some(h) = state.auto_poll.lock().unwrap().take() {
         let _ = h.join();
     }
-    println!("{} [auto_poll] stopped on exit", log_prefix());
 }

@@ -50,6 +50,8 @@ function init() {
 async function syncActiveScene() {
   try {
     const st = await ipc.getPollStatus();
+    // 锁屏 / 无前台窗口时 app_name 为空，属正常状态，不更新场景与状态文本
+    if (!st.app_name) return;
     const s = st.matched_scene | 0;
     if (s >= 0 && s < km.SCENE_MAX) {
       if (s !== state.activeScene) {
