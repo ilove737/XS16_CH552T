@@ -266,20 +266,36 @@ export function setLayerData(data, scene, layer, layerData) {
 // 默认键位（6 槽，与固件 src/keyMap.h sceneMapTable 保持一致）
 // =========================================================================
 
-// 通用主层（deepin 系统快捷键）32 字节：[mod,key]×16
+// 通用主层（deepin 系统快捷键，按 keymap_XS16 导出 槽0主层）32 字节：[mod,key]×16
 const DEFAULT_MAIN = [
-  [0x05, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // 终端/启动器/截图/录屏
-  [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],  // Alt+Tab/Super+D/Super+E/Super+L
-  [0x04, 0x3d], [0x08, 0x16], [0x08, 0x52], [0x08, 0x51],  // F4/工作区/↑/↓
-  [0xff, 0x00], [0x05, 0x29], [0x05, 0x4c], [0x08, 0x13],  // Fn/监视器/关机/显示器
+  [0x05, 0x50], [0x08, 0x16], [0x02, 0x2c], [0x05, 0x4f],  // Ctrl+Alt+←/Win+S/Shift+Space/Ctrl+Alt+→
+  [0x04, 0x2b], [0x04, 0x35], [0x06, 0x35], [0x06, 0x2b],  // Alt+Tab/Alt+`/Shift+Alt+`/Shift+Alt+Tab
+  [0x04, 0x3b], [0x08, 0x11], [0x08, 0x52], [0x08, 0x19],  // Alt+F2/Win+N/Win+↑/Win+V
+  [0xff, 0x00], [0x08, 0x50], [0x08, 0x51], [0x08, 0x4f],  // Fn/Win+←/Win+↓/Win+→
 ];
 
-// 终端主层（deepin-terminal）
+// 槽 0 Fn 层（generic，按 keymap_XS16 导出 槽0Fn）：截图/录屏/图文识别 + 鼠标
+const DEFAULT_FN_GENERIC = [
+  [0x05, 0x0c], [0x05, 0x04], [0x01, 0x46], [0x00, 0x46],  // Ctrl+Alt+I/A/Ctrl+PrtSc/PrtSc
+  [0x04, 0x46], [0x05, 0x06], [0x05, 0x15], [0x08, 0x08],  // Alt+PrtSc/Ctrl+Alt+C/R/Win+E
+  [0x08, 0x00], [0xfe, 1], [0xfe, 4], [0xfe, 2],           // Win+空/鼠标左/上/右
+  [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],           // Fn/鼠标左/下/右
+];
+
+// 终端主层（deepin-terminal，按 keymap_XS16 导出 槽1主层）
 const DEFAULT_MAIN_TERMINAL = [
-  [0x03, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // Ctrl+Shift+T/启动器/截图/录屏
-  [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],
-  [0x01, 0x3d], [0x08, 0x52], [0x01, 0x0f], [0x03, 0x06],  // Ctrl+F4/↑/Ctrl+L/Ctrl+Shift+C
-  [0xff, 0x00], [0x03, 0x11], [0x03, 0x19], [0x01, 0x2e],  // Fn/新窗口/粘贴/放大
+  [0x03, 0x1e], [0x03, 0x1f], [0x01, 0x2e], [0x01, 0x2d],  // Ctrl+Shift+1/2/Ctrl+=/Ctrl+-
+  [0x03, 0x17], [0x03, 0x2b], [0x01, 0x2b], [0x04, 0x1a],  // Ctrl+Shift+T/Tab/Tab/Alt+W
+  [0x03, 0x06], [0x03, 0x19], [0x04, 0x51], [0x04, 0x14],  // Ctrl+Shift+C/V/Alt+↓/Alt+Q
+  [0xff, 0x00], [0x04, 0x50], [0x04, 0x52], [0x04, 0x4f],  // Fn/Alt+←/↑/→
+];
+
+// 槽 1 Fn 层（deepin-terminal，按 keymap_XS16 导出 槽1Fn）：分屏/查找/全选 + 鼠标
+const DEFAULT_FN_TERMINAL = [
+  [0x03, 0x0d], [0x03, 0x0b], [0x05, 0x09], [0x01, 0x27],  // Ctrl+Shift+J/H/Ctrl+Alt+F/Ctrl+0
+  [0x03, 0x04], [0x00, 0x44], [0x03, 0x1a], [0x03, 0x14],  // Ctrl+Shift+A/F11/Ctrl+Shift+W/Q
+  [0x00, 0x3b], [0xfe, 1], [0xfe, 4], [0xfe, 2],           // F2/鼠标左/上/右
+  [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],           // Fn/鼠标左/下/右
 ];
 
 // 浏览器主层（firefox）
@@ -290,7 +306,7 @@ const DEFAULT_MAIN_BROWSER = [
   [0xff, 0x00], [0x01, 0x0f], [0x03, 0x17], [0x01, 0x07],  // Fn/地址栏/恢复/书签
 ];
 
-// 通用 Fn 层（所有槽共用）32 字节：[mod,key]×16
+// 通用 Fn 层（槽 2~5 共用）32 字节：[mod,key]×16
 const DEFAULT_FN = [
   [0, 0x29], [0, 0x3a], [0, 0x3b], [0, 0x3c],
   [0, 0x2b], [0, 0x44], [0, 0x45], [0, 0x08],
@@ -311,13 +327,15 @@ function flatten(entries) {
 // 生成默认键位映射 Uint8Array(480)：6 槽 × 80 字节
 export function makeDefaultKeymap() {
   const raw = new Uint8Array(KEYMAP_SIZE);
+  const names = ['generic', 'deepin-terminal', '', '', '', ''];
   const mains = [DEFAULT_MAIN, DEFAULT_MAIN_TERMINAL, DEFAULT_MAIN_BROWSER,
                  DEFAULT_MAIN, DEFAULT_MAIN, DEFAULT_MAIN];
-  const names = ['generic', 'deepin-terminal', 'firefox', '', '', ''];
+  const fns = [DEFAULT_FN_GENERIC, DEFAULT_FN_TERMINAL, DEFAULT_FN,
+               DEFAULT_FN, DEFAULT_FN, DEFAULT_FN];
   for (let s = 0; s < SCENE_MAX; s++) {
     packAppName(raw, s, names[s]);
     raw.set(flatten(mains[s]), s * SCENE_MAP_SIZE + MAP_MAIN_OFF);
-    raw.set(flatten(DEFAULT_FN), s * SCENE_MAP_SIZE + MAP_FN_OFF);
+    raw.set(flatten(fns[s]), s * SCENE_MAP_SIZE + MAP_FN_OFF);
   }
   return raw;
 }
@@ -411,6 +429,26 @@ export function formatKeymapText(data) {
     }
   }
   return out;
+}
+
+// 按 (mod,key) 查询 deepin 可读快捷键条目；source='terminal' 用终端表，否则系统表
+export function lookupFriendlyName(mod, key, source) {
+  const data = source === 'deepin-terminal' ? DEEPIN_TERMINAL_SHORTCUTS : DEEPIN_SHORTCUTS;
+  for (const group of data) {
+    for (const it of group.items) {
+      if (it.mod === mod && it.key === key) return it;
+    }
+  }
+  return null;
+}
+
+// 组合键内容串（用于鼠标悬浮）：优先用 label，否则回退拼接
+export function comboString(mod, key, item) {
+  if (item && item.label) return item.label;
+  if (isMouseAction(mod)) return mouseShortName(key) || '鼠标';
+  const prefix = modName(mod);
+  const k = mod === 0xff && key === 0x00 ? 'Fn' : (shortName(key) || keycodeName(key));
+  return prefix === '0' || prefix === 'Fn' ? k : `${prefix}+${k}`;
 }
 
 // =========================================================================
@@ -618,22 +656,80 @@ export const DEEPIN_TERMINAL_SHORTCUTS = [
   }
 ];
 
-// 按 (mod,key) 查询 deepin 可读快捷键条目；source='terminal' 用终端表，否则系统表
-export function lookupFriendlyName(mod, key, source) {
-  const data = source === 'deepin-terminal' ? DEEPIN_TERMINAL_SHORTCUTS : DEEPIN_SHORTCUTS;
-  for (const group of data) {
-    for (const it of group.items) {
-      if (it.mod === mod && it.key === key) return it;
-    }
+export const DEEPIN_FILEMANAGER_SHORTCUTS = [
+  {
+    category: '文件',
+    items: [
+      { name: '选择到第一个文件', mod: 0x02, key: 0x4a, label: 'Shift+Home' },
+      { name: '选择到最后一个文件', mod: 0x02, key: 0x4d, label: 'Shift+End' },
+      { name: '向前选择', mod: 0x02, key: 0x50, label: 'Shift+Left' },
+      { name: '向后选择', mod: 0x02, key: 0x4f, label: 'Shift+Right' },
+      { name: '向上一行选择', mod: 0x02, key: 0x52, label: 'Shift+Up' },
+      { name: '向下一行选择', mod: 0x02, key: 0x51, label: 'Shift+Down' },
+      { name: '反选', mod: 0x03, key: 0x0c, label: 'Ctrl+Shift+I' },
+      { name: '打开', mod: 0x01, key: 0x51, label: 'Ctrl+Down' },
+      { name: '打开', mod: 0x04, key: 0x51, label: 'Alt+Down' },
+      { name: '返回上一级', mod: 0x01, key: 0x52, label: 'Ctrl+Up' },
+      { name: '彻底删除', mod: 0x02, key: 0x4c, label: 'Shift+Delete' },
+      { name: '删除文件', mod: 0x00, key: 0x4c, label: 'Delete' },
+      { name: '删除文件', mod: 0x01, key: 0x07, label: 'Ctrl+D' },
+      { name: '全选', mod: 0x01, key: 0x04, label: 'Ctrl+A' },
+      { name: '复制', mod: 0x01, key: 0x06, label: 'Ctrl+C' },
+      { name: '剪切', mod: 0x01, key: 0x1b, label: 'Ctrl+X' },
+      { name: '粘贴', mod: 0x01, key: 0x19, label: 'Ctrl+V' },
+      { name: '重命名', mod: 0x00, key: 0x3b, label: 'F2' },
+      { name: '复制文件地址', mod: 0x03, key: 0x06, label: 'Ctrl+Shift+C' },
+      { name: '在终端中打开', mod: 0x02, key: 0x17, label: 'Shift+T' },
+      { name: '撤销', mod: 0x01, key: 0x1d, label: 'Ctrl+Z' },
+      { name: '重做', mod: 0x01, key: 0x1c, label: 'Ctrl+Y' }
+    ]
+  },
+  {
+    category: '新建/搜索',
+    items: [
+      { name: '新建窗口', mod: 0x01, key: 0x11, label: 'Ctrl+N' },
+      { name: '新建文件夹', mod: 0x03, key: 0x11, label: 'Ctrl+Shift+N' },
+      { name: '搜索', mod: 0x01, key: 0x09, label: 'Ctrl+F' },
+      { name: '新建标签', mod: 0x01, key: 0x17, label: 'Ctrl+T' }
+    ]
+  },
+  {
+    category: '视图',
+    items: [
+      { name: '文件信息', mod: 0x01, key: 0x0c, label: 'Ctrl+I' },
+      { name: '帮助手册', mod: 0x00, key: 0x3a, label: 'F1' },
+      { name: '所有快捷键', mod: 0x03, key: 0x38, label: 'Ctrl+Shift+/' }
+    ]
+  },
+  {
+    category: '切换显示状态',
+    items: [
+      { name: '隐藏文件', mod: 0x01, key: 0x0b, label: 'Ctrl+H' },
+      { name: '地址栏输入', mod: 0x01, key: 0x0f, label: 'Ctrl+L' },
+      { name: '切换到图标视图', mod: 0x01, key: 0x1e, label: 'Ctrl+1' },
+      { name: '切换到列表视图', mod: 0x01, key: 0x1f, label: 'Ctrl+2' },
+      { name: '切换到树形视图', mod: 0x01, key: 0x20, label: 'Ctrl+3' }
+    ]
+  },
+  {
+    category: '其他',
+    items: [
+      { name: '关闭', mod: 0x04, key: 0x3d, label: 'Alt+F4' },
+      { name: '关闭当前标签', mod: 0x01, key: 0x1a, label: 'Ctrl+W' },
+      { name: '后退', mod: 0x04, key: 0x50, label: 'Alt+Left' },
+      { name: '前进', mod: 0x04, key: 0x4f, label: 'Alt+Right' },
+      { name: '切换到下一个标签', mod: 0x01, key: 0x2b, label: 'Ctrl+Tab' },
+      { name: '切换到上一个标签', mod: 0x03, key: 0x2b, label: 'Ctrl+Shift+Tab' },
+      { name: '下一个文件', mod: 0x00, key: 0x2b, label: 'Tab' },
+      { name: '上一个文件', mod: 0x02, key: 0x2b, label: 'Shift+Tab' },
+      { name: '切换到标签 1', mod: 0x04, key: 0x1e, label: 'Alt+1' },
+      { name: '切换到标签 2', mod: 0x04, key: 0x1f, label: 'Alt+2' },
+      { name: '切换到标签 3', mod: 0x04, key: 0x20, label: 'Alt+3' },
+      { name: '切换到标签 4', mod: 0x04, key: 0x21, label: 'Alt+4' },
+      { name: '切换到标签 5', mod: 0x04, key: 0x22, label: 'Alt+5' },
+      { name: '切换到标签 6', mod: 0x04, key: 0x23, label: 'Alt+6' },
+      { name: '切换到标签 7', mod: 0x04, key: 0x24, label: 'Alt+7' },
+      { name: '切换到标签 8', mod: 0x04, key: 0x25, label: 'Alt+8' }
+    ]
   }
-  return null;
-}
-
-// 组合键内容串（用于鼠标悬浮）：优先用 label，否则回退拼接
-export function comboString(mod, key, item) {
-  if (item && item.label) return item.label;
-  if (isMouseAction(mod)) return mouseShortName(key) || '鼠标';
-  const prefix = modName(mod);
-  const k = mod === 0xff && key === 0x00 ? 'Fn' : (shortName(key) || keycodeName(key));
-  return prefix === '0' || prefix === 'Fn' ? k : `${prefix}+${k}`;
-}
+];

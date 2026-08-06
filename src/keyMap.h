@@ -36,54 +36,68 @@ UINT8C __at(0x3600) sceneMapTable[SCENE_MAX][SCENE_MAP_SIZE] = {
     {
         /* 应用名 0..15 */
         'g','e','n','e','r','i','c', 0,0,0,0,0,0,0,0,0,
-        /* 主层键位 16..47（deepin 系统快捷键） */
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_T,      // Ctrl+Alt+T  打开终端
-        0, KEY_LEFTMETA,                        // Super       启动器
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_A,      // Ctrl+Alt+A  截图
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_R,      // Ctrl+Alt+R  录屏
-        KEY_MOD_LALT, KEY_TAB,                  // Alt+Tab     切换窗口
-        KEY_MOD_LMETA, KEY_D,                   // Super+D     显示桌面
-        KEY_MOD_LMETA, KEY_E,                   // Super+E     文件管理器
-        KEY_MOD_LMETA, KEY_L,                   // Super+L     锁屏
-        KEY_MOD_LALT, KEY_F4,                   // Alt+F4      关闭窗口
-        KEY_MOD_LMETA, KEY_S,                   // Super+S     工作区
-        KEY_MOD_LMETA, KEY_UP,                  // Super+↑     最大化
-        KEY_MOD_LMETA, KEY_DOWN,                // Super+↓     恢复窗口
-        KEY_FnX, 0,                             // Fn          切换 Fn 层
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_ESC,    // Ctrl+Alt+Esc 系统监视器
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_DELETE, // Ctrl+Alt+Del 关机菜单
-        KEY_MOD_LMETA, KEY_P,                   // Super+P     显示器设置
-        /* Fn 层键位 48..79（通用功能键） */
-        0, KEY_ESC,  0, KEY_F1,  0, KEY_F2,  0, KEY_F3,
-        0, KEY_TAB,  0, KEY_F11, 0, KEY_F12, 0, KEY_E,
-        0, KEY_CAPSLOCK, 0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
+        /* 主层键位 16..47（deepin 系统快捷键，按 keymap_XS16 导出） */
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_LEFT,    // Ctrl+Alt+←  切换到左边工作区
+        KEY_MOD_LMETA, KEY_S,                    // Win+S       显示工作区
+        KEY_MOD_LSHIFT, KEY_SPACE,               // Shift+Space 全局搜索
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_RIGHT,   // Ctrl+Alt+→  切换到右边工作区
+        KEY_MOD_LALT, KEY_TAB,                   // Alt+Tab     切换窗口
+        KEY_MOD_LALT, KEY_GRAVE,                 // Alt+`       切换同类型窗口
+        KEY_MOD_LSHIFT|KEY_MOD_LALT, KEY_GRAVE,  // Shift+Alt+` 反向切换同类型窗口
+        KEY_MOD_LSHIFT|KEY_MOD_LALT, KEY_TAB,    // Shift+Alt+Tab 反向切换窗口
+        KEY_MOD_LALT, KEY_F2,                    // Alt+F2      终端雷神模式
+        KEY_MOD_LMETA, KEY_N,                    // Win+N       最小化窗口
+        KEY_MOD_LMETA, KEY_UP,                   // Win+↑       最大化窗口
+        KEY_MOD_LMETA, KEY_V,                    // Win+V       剪贴板
+        KEY_FnX, 0,                              // Fn          切换 Fn 层
+        KEY_MOD_LMETA, KEY_LEFT,                 // Win+←       窗口平铺左侧
+        KEY_MOD_LMETA, KEY_DOWN,                 // Win+↓       恢复窗口
+        KEY_MOD_LMETA, KEY_RIGHT,                // Win+→       窗口平铺右侧
+        /* Fn 层键位 48..79（deepin 截图/录屏/图文识别 + 鼠标，按 keymap_XS16 导出） */
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_I,       // Ctrl+Alt+I  滚动截图
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_A,       // Ctrl+Alt+A  截图
+        KEY_MOD_LCTRL, KEY_SYSRQ,                // Ctrl+PrtSc  延时截图
+        0, KEY_SYSRQ,                            // PrtSc       全屏截图
+        KEY_MOD_LALT, KEY_SYSRQ,                 // Alt+PrtSc   窗口截图
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_C,       // Ctrl+Alt+C  图文识别
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_R,       // Ctrl+Alt+R  录屏
+        KEY_MOD_LMETA, KEY_E,                    // Win+E       文件管理器
+        KEY_MOD_LMETA, 0,                        // Win+空      启动器(占位)
+        0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
     // ---- 槽 1：场景 1（编号 1，应用名 deepin-terminal，终端定制键位） ----
     {
         /* 应用名 0..15 */
         'd','e','e','p','i','n','-','t','e','r','m', 'i','n','a','l',0,
-        /* 主层键位 16..47（终端定制） */
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_T,   // Ctrl+Shift+T  终端新建标签页
-        0, KEY_LEFTMETA,                        // Super          启动器
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_A,      // Ctrl+Alt+A     截图
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_R,      // Ctrl+Alt+R     录屏
-        KEY_MOD_LALT, KEY_TAB,                  // Alt+Tab        切换窗口
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_TAB,  // Ctrl+Shift+Tab 上一个标签页
-        KEY_MOD_LCTRL, KEY_TAB,                 // Ctrl+Tab       下一个标签页
-        KEY_MOD_LMETA, KEY_L,                   // Super+L        锁屏
-        KEY_MOD_LCTRL, KEY_F4,                  // Ctrl+F4        关闭标签页
-        KEY_MOD_LMETA, KEY_UP,                  // Super+↑        最大化
-        KEY_MOD_LCTRL, KEY_L,                   // Ctrl+L         清屏
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_C,    // Ctrl+Shift+C   复制
-        KEY_FnX, 0,                             // Fn             切换 Fn 层
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_N,    // Ctrl+Shift+N   新窗口
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_V,    // Ctrl+Shift+V   粘贴
-        KEY_MOD_LCTRL, KEY_EQUAL,               // Ctrl+=         放大字号
-        /* Fn 层键位 48..79（通用功能键） */
-        0, KEY_ESC,  0, KEY_F1,  0, KEY_F2,  0, KEY_F3,
-        0, KEY_TAB,  0, KEY_F11, 0, KEY_F12, 0, KEY_E,
-        0, KEY_CAPSLOCK, 0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
+        /* 主层键位 16..47（终端定制，按 keymap_XS16 导出） */
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_1,   // Ctrl+Shift+1 切换到标签1
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_2,   // Ctrl+Shift+2 切换到标签2
+        KEY_MOD_LCTRL, KEY_EQUAL,              // Ctrl+=       放大字号
+        KEY_MOD_LCTRL, KEY_MINUS,              // Ctrl+-       缩小字号
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_T,   // Ctrl+Shift+T 新建标签页
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_TAB, // Ctrl+Shift+Tab 上一个标签页
+        KEY_MOD_LCTRL, KEY_TAB,                // Ctrl+Tab     下一个标签页
+        KEY_MOD_LALT, KEY_W,                   // Alt+W        关闭标签页
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_C,   // Ctrl+Shift+C 复制
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_V,   // Ctrl+Shift+V 粘贴
+        KEY_MOD_LALT, KEY_DOWN,                // Alt+↓        选择下面工作区
+        KEY_MOD_LALT, KEY_Q,                   // Alt+Q        关闭工作区
+        KEY_FnX, 0,                            // Fn           切换 Fn 层
+        KEY_MOD_LALT, KEY_LEFT,                // Alt+←        选择左边工作区
+        KEY_MOD_LALT, KEY_UP,                  // Alt+↑        选择上面工作区
+        KEY_MOD_LALT, KEY_RIGHT,               // Alt+→        选择右边工作区
+        /* Fn 层键位 48..79（终端分屏/查找/全选 + 鼠标，按 keymap_XS16 导出） */
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_J,   // Ctrl+Shift+J 纵向分屏
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_H,   // Ctrl+Shift+H 横向分屏
+        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_F,     // Ctrl+Alt+F   查找
+        KEY_MOD_LCTRL, KEY_0,                  // Ctrl+0       默认大小
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_A,   // Ctrl+Shift+A 全选
+        0, KEY_F11,                            // F11          全屏
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_W,   // Ctrl+Shift+W 关闭其他标签页
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_Q,   // Ctrl+Shift+Q 关闭其他工作区
+        0, KEY_F2,                             // F2           重命名标题
+        0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
     // ---- 槽 2：场景 2（编号 2，应用名 firefox，浏览器定制键位） ----
