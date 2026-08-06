@@ -344,10 +344,12 @@ function switchEditMode(mode) {
   $('modalHint').hidden = isMouse || isDeepin;
   $('deepinFieldset').hidden = !isDeepin;
   if (isDeepin) {
-    // 每次进入 deepin 模式都重置到「系统快捷键」标签并重建列表
+    // 根据当前编辑场景的应用名，自动索引到「系统快捷键 / 终端快捷键」
+    const appName = km.unpackAppName(state.data, state.scene);
+    const src = appName === 'deepin-terminal' ? 'terminal' : 'system';
     document.querySelectorAll('.deepin-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.source === 'system'));
-    buildDeepinList('system');
+      t.classList.toggle('active', t.dataset.source === src));
+    buildDeepinList(src);
   }
   if ((isMouse || isDeepin) && capture) { capture.stop(); capture = null; }
 }
@@ -361,8 +363,13 @@ function openEdit(idx, layer) {
     `编辑键位 ${idx} (槽${state.scene}·${sceneLabel(state.scene)} ${layerName}, 行${Math.floor(idx / COLS)} 列${idx % COLS})`;
 
   const isMouse = km.isMouseAction(mod);
-  document.querySelector('input[name="editMode"][value="' + (isMouse ? 'mouse' : 'keyboard') + '"]').checked = true;
-  switchEditMode(isMouse ? 'mouse' : 'keyboard');
+  // 若该键命中 deepin 系统/终端快捷键表，则自动进入 Deepin 编辑模式
+  const appName = km.unpackAppName(state.data, state.scene);
+  const deepinSource = appName === 'deepin-terminal' ? 'deepin-terminal' : 'system';
+  const hitDeepin = !isMouse && km.lookupFriendlyName(mod, key, deepinSource);
+  const openMode = isMouse ? 'mouse' : (hitDeepin ? 'deepin' : 'keyboard');
+  document.querySelector('input[name="editMode"][value="' + openMode + '"]').checked = true;
+  switchEditMode(openMode);
 
   if (isMouse) {
     document.querySelectorAll('.mouse-btn').forEach(btn => {
