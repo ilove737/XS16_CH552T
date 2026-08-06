@@ -1,6 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1e1e1e"/>
-  <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle"
-        font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="700"
-        fill="#4fc3f7">XS40</text>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b3a55"/>
+      <stop offset="1" stop-color="#1b2536"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8edf5"/>
+      <stop offset="1" stop-color="#c2ccdb"/>
+    </linearGradient>
+    <linearGradient id="keyHi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fd1c5"/>
+      <stop offset="1" stop-color="#2bb3a3"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="64" ry="64" fill="url(#board)"/>
+
+  <g font-family="Arial, 'Segoe UI', sans-serif" font-weight="700" text-anchor="middle">
+      <rect x="44" y="44" width="100" height="100" rx="18" fill="url(#keyHi)"/>
+      <rect x="152" y="44" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="260" y="44" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="368" y="44" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="44" y="152" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="152" y="152" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="260" y="152" width="100" height="100" rx="18" fill="url(#keyHi)"/>
+      <rect x="368" y="152" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="44" y="260" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="152" y="260" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="260" y="260" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="368" y="260" width="100" height="100" rx="18" fill="url(#keyHi)"/>
+      <rect x="44" y="368" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="152" y="368" width="100" height="100" rx="18" fill="url(#keyHi)"/>
+      <rect x="260" y="368" width="100" height="100" rx="18" fill="url(#key)"/>
+      <rect x="368" y="368" width="100" height="100" rx="18" fill="url(#key)"/>
+      <text x="94.0" y="110.0" font-size="48" fill="#0c3b35">X</text>
+      <text x="202.0" y="110.0" font-size="48" fill="#3a4658">S</text>
+      <text x="310.0" y="110.0" font-size="48" fill="#3a4658">1</text>
+      <text x="418.0" y="110.0" font-size="48" fill="#3a4658">6</text>
+      <text x="94.0" y="218.0" font-size="48" fill="#3a4658">L</text>
+      <text x="202.0" y="218.0" font-size="48" fill="#3a4658">X</text>
+      <text x="310.0" y="218.0" font-size="48" fill="#0c3b35">S</text>
+      <text x="418.0" y="218.0" font-size="48" fill="#3a4658">%</text>
+      <text x="94.0" y="326.0" font-size="48" fill="#3a4658">@</text>
+      <text x="202.0" y="326.0" font-size="48" fill="#3a4658">W</text>
+      <text x="310.0" y="326.0" font-size="48" fill="#3a4658">Z</text>
+      <text x="418.0" y="326.0" font-size="48" fill="#0c3b35">H</text>
+      <text x="94.0" y="434.0" font-size="48" fill="#3a4658">♥️</text>
+      <text x="202.0" y="434.0" font-size="48" fill="#0c3b35">L</text>
+      <text x="310.0" y="434.0" font-size="48" fill="#3a4658">G</text>
+      <text x="418.0" y="434.0" font-size="48" fill="#3a4658">Z</text>
+  </g>
 </svg>

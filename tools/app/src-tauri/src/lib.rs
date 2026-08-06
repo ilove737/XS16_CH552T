@@ -15,6 +15,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, RunEvent, State, WindowEvent,
 };
+use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 
 const VID: u16 = 0x4c58;
 const PID: u16 = 0x5310;
@@ -526,6 +527,63 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+/// 在 X11 (Linux) 上，Tauri v2 的 `set_icon` 不会把图标写入窗口的 `_NET_WM_ICON`
+/// 属性，导致 DDE/GNOME 任务栏显示默认图标。这里直接用 X11 协议把 PNG 图标写入
+/// `_NET_WM_ICON`，确保任务栏显示应用图标。非 X11 平台直接跳过。
+#[cfg(target_os = "linux")]
+fn set_x11_window_icon(window: &tauri::WebviewWindow) -> Option<()> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{ConnectionExt as XProtoExt, PropMode};
+    use x11rb::wrapper::ConnectionExt;
+
+    // 1. 取 X11 原生窗口 ID
+    let raw = window.raw_window_handle().ok()?;
+    let xid: u32 = match raw {
+        RawWindowHandle::Xlib(h) => h.window as u32,
+        _ => return None,
+    };
+    if xid == 0 {
+        return None;
+    }
+
+    // 2. 连接 X server（同用户进程可修改任意窗口属性）
+    let (conn, _screen) = x11rb::connect(None).ok()?;
+
+    // 3. 解码 PNG -> RGBA 像素
+    let icon_bytes = include_bytes!("../icons/icon.png");
+    let img = tauri::image::Image::from_bytes(icon_bytes).ok()?;
+    let w = img.width();
+    let h = img.height();
+    let rgba = img.rgba(); // &[u8], 长度 = w*h*4 (RGBA)
+
+    // 4. 构造 _NET_WM_ICON 数据：[w, h, ARGB...]，ARGB = 0xAARRGGBB
+    let mut data: Vec<u32> = Vec::with_capacity(2 + w as usize * h as usize);
+    data.push(w);
+    data.push(h);
+    for px in rgba.chunks_exact(4) {
+        let r = px[0] as u32;
+        let g = px[1] as u32;
+        let b = px[2] as u32;
+        let a = px[3] as u32;
+        data.push((a << 24) | (r << 16) | (g << 8) | b);
+    }
+
+    // 5. 写入属性（CARDINAL 预定义 atom = 6）
+    let atom = conn
+        .intern_atom(false, b"_NET_WM_ICON")
+        .ok()?
+        .reply()
+        .ok()?
+        .atom;
+    if atom == 0 {
+        return None;
+    }
+    conn.change_property32(PropMode::REPLACE, xid, atom, 6u32, &data)
+        .ok()?;
+    conn.flush().ok()?;
+    Some(())
+}
+
 fn open_first(api: &HidApi, _state: &State<AppState>) -> Result<HidDevice, String> {
     let dev = api
         .open(VID, PID)
@@ -549,6 +607,19 @@ pub fn run() {
         .setup(|app| {
             // 创建系统托盘（图标 + 菜单 + 托盘点击恢复窗口）
             setup_tray(app.handle())?;
+
+            // 给主窗口设置图标，确保任务栏/标题栏显示应用图标
+            if let Some(window) = app.get_webview_window("main") {
+                #[cfg(target_os = "linux")]
+                let _ = set_x11_window_icon(&window);
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let icon_bytes = include_bytes!("../icons/icon.png");
+                    if let Ok(img) = tauri::image::Image::from_bytes(icon_bytes) {
+                        let _ = window.set_icon(img);
+                    }
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
