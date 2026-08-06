@@ -314,7 +314,23 @@ const DEFAULT_FN_CODE = [
   [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],           // Fn/鼠标左/下/右
 ];
 
-// 通用 Fn 层（槽 3~5 共用）32 字节：[mod,key]×16
+// 文件管理器主层（dde-file-manager，deepin 文件管理器，按 DEEPIN_FILEMANAGER_SHORTCUTS 挑选）
+const DEFAULT_MAIN_FILEMANAGER = [
+  [0x01, 0x11], [0x03, 0x11], [0x01, 0x17], [0x01, 0x1a],  // Ctrl+N/Ctrl+Shift+N/Ctrl+T/Ctrl+W
+  [0x01, 0x09], [0x01, 0x0f], [0x04, 0x50], [0x04, 0x4f],  // Ctrl+F/Ctrl+L/Alt+←/Alt+→
+  [0x01, 0x52], [0x01, 0x51], [0x01, 0x04], [0x01, 0x2b],  // Ctrl+↑/Ctrl+↓/Ctrl+A/Ctrl+Tab
+  [0xff, 0x00], [0x01, 0x06], [0x01, 0x1b], [0x01, 0x19],  // Fn/Ctrl+C/Ctrl+X/Ctrl+V
+];
+
+// 文件管理器 Fn 层（重命名/删除/撤销 + 鼠标）
+const DEFAULT_FN_FILEMANAGER = [
+  [0x00, 0x3b], [0x00, 0x4c], [0x02, 0x4c], [0x03, 0x06],  // F2/Delete/Shift+Delete/Ctrl+Shift+C
+  [0x02, 0x17], [0x01, 0x0b], [0x01, 0x1d], [0x01, 0x1c],  // Shift+T/Ctrl+H/Ctrl+Z/Ctrl+Y
+  [0x03, 0x2b], [0xfe, 1], [0xfe, 4], [0xfe, 2],           // Ctrl+Shift+Tab/鼠标左/上/右
+  [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],           // Fn/鼠标左/下/右
+];
+
+// 通用 Fn 层（槽 4~5 共用）32 字节：[mod,key]×16
 const DEFAULT_FN = [
   [0, 0x29], [0, 0x3a], [0, 0x3b], [0, 0x3c],
   [0, 0x2b], [0, 0x44], [0, 0x45], [0, 0x08],
@@ -335,11 +351,11 @@ function flatten(entries) {
 // 生成默认键位映射 Uint8Array(480)：6 槽 × 80 字节
 export function makeDefaultKeymap() {
   const raw = new Uint8Array(KEYMAP_SIZE);
-  const names = ['generic', 'deepin-terminal', 'code', '', '', ''];
+  const names = ['generic', 'deepin-terminal', 'code', 'dde-file-manager', '', ''];
   const mains = [DEFAULT_MAIN, DEFAULT_MAIN_TERMINAL, DEFAULT_MAIN_CODE,
-                 DEFAULT_MAIN, DEFAULT_MAIN, DEFAULT_MAIN];
+                 DEFAULT_MAIN_FILEMANAGER, DEFAULT_MAIN, DEFAULT_MAIN];
   const fns = [DEFAULT_FN_GENERIC, DEFAULT_FN_TERMINAL, DEFAULT_FN_CODE,
-               DEFAULT_FN, DEFAULT_FN, DEFAULT_FN];
+               DEFAULT_FN_FILEMANAGER, DEFAULT_FN, DEFAULT_FN];
   for (let s = 0; s < SCENE_MAX; s++) {
     packAppName(raw, s, names[s]);
     raw.set(flatten(mains[s]), s * SCENE_MAP_SIZE + MAP_MAIN_OFF);
@@ -439,9 +455,10 @@ export function formatKeymapText(data) {
   return out;
 }
 
-// 按 (mod,key) 查询可读快捷键条目；source='deepin-terminal'/'vscode' 用对应表，否则系统表
+// 按 (mod,key) 查询可读快捷键条目；source='deepin-terminal'/'filemanager'/'vscode' 用对应表，否则系统表
 export function lookupFriendlyName(mod, key, source) {
   const data = source === 'deepin-terminal' ? DEEPIN_TERMINAL_SHORTCUTS
+             : source === 'filemanager' ? DEEPIN_FILEMANAGER_SHORTCUTS
              : source === 'vscode' ? VSCODE_SHORTCUTS
              : DEEPIN_SHORTCUTS;
   for (const group of data) {

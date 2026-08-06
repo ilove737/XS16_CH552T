@@ -134,31 +134,38 @@ UINT8C __at(0x3600) sceneMapTable[SCENE_MAX][SCENE_MAP_SIZE] = {
         0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
-    // ---- 槽 3：预留场景（编号 3，应用名为空，沿用通用键位） ----
+    // ---- 槽 3：场景 3（编号 3，应用名 dde-file-manager，deepin 文件管理器定制键位） ----
     {
         /* 应用名 0..15 */
-        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        /* 主层键位 16..47（通用） */
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_T,
-        0, KEY_LEFTMETA,
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_A,
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_R,
-        KEY_MOD_LALT, KEY_TAB,
-        KEY_MOD_LMETA, KEY_D,
-        KEY_MOD_LMETA, KEY_E,
-        KEY_MOD_LMETA, KEY_L,
-        KEY_MOD_LALT, KEY_F4,
-        KEY_MOD_LMETA, KEY_S,
-        KEY_MOD_LMETA, KEY_UP,
-        KEY_MOD_LMETA, KEY_DOWN,
-        KEY_FnX, 0,
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_ESC,
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_DELETE,
-        KEY_MOD_LMETA, KEY_P,
-        /* Fn 层键位 48..79（通用功能键） */
-        0, KEY_ESC,  0, KEY_F1,  0, KEY_F2,  0, KEY_F3,
-        0, KEY_TAB,  0, KEY_F11, 0, KEY_F12, 0, KEY_E,
-        0, KEY_CAPSLOCK, 0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
+        'f','i','l','e','-','m','a','n','a','g','e','r', 0,0,0,0,
+        /* 主层键位 16..47（文件管理器高频操作，按 DEEPIN_FILEMANAGER_SHORTCUTS 挑选） */
+        KEY_MOD_LCTRL, KEY_N,                  // Ctrl+N         新建窗口
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_N,   // Ctrl+Shift+N   新建文件夹
+        KEY_MOD_LCTRL, KEY_T,                  // Ctrl+T         新建标签
+        KEY_MOD_LCTRL, KEY_W,                  // Ctrl+W         关闭当前标签
+        KEY_MOD_LCTRL, KEY_F,                  // Ctrl+F         搜索
+        KEY_MOD_LCTRL, KEY_L,                  // Ctrl+L         地址栏输入
+        KEY_MOD_LALT, KEY_LEFT,                // Alt+←          后退
+        KEY_MOD_LALT, KEY_RIGHT,               // Alt+→          前进
+        KEY_MOD_LCTRL, KEY_UP,                 // Ctrl+↑         返回上一级
+        KEY_MOD_LCTRL, KEY_DOWN,               // Ctrl+↓         打开
+        KEY_MOD_LCTRL, KEY_A,                  // Ctrl+A         全选
+        KEY_MOD_LCTRL, KEY_TAB,                // Ctrl+Tab       切换到下一个标签
+        KEY_FnX, 0,                            // Fn             切换 Fn 层
+        KEY_MOD_LCTRL, KEY_C,                  // Ctrl+C         复制
+        KEY_MOD_LCTRL, KEY_X,                  // Ctrl+X         剪切
+        KEY_MOD_LCTRL, KEY_V,                  // Ctrl+V         粘贴
+        /* Fn 层键位 48..79（重命名/删除/撤销 + 鼠标） */
+        0, KEY_F2,                             // F2             重命名
+        0, KEY_DELETE,                         // Delete         删除文件
+        KEY_MOD_LSHIFT, KEY_DELETE,            // Shift+Delete   彻底删除
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_C,   // Ctrl+Shift+C   复制文件地址
+        KEY_MOD_LSHIFT, KEY_T,                 // Shift+T        在终端中打开
+        KEY_MOD_LCTRL, KEY_H,                  // Ctrl+H         隐藏文件
+        KEY_MOD_LCTRL, KEY_Z,                  // Ctrl+Z         撤销
+        KEY_MOD_LCTRL, KEY_Y,                  // Ctrl+Y         重做
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_TAB, // Ctrl+Shift+Tab 切换到上一个标签
+        0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
     // ---- 槽 4：预留场景（编号 4，应用名为空，沿用通用键位） ----
