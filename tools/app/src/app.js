@@ -306,13 +306,15 @@ function renderOne(grid, layer) {
   grid.style.setProperty('--syskey-color', SYSKEY_COLOR);
   grid.style.setProperty('--syskey-color-light', SYSKEY_COLOR_LIGHT);
   const appName = km.unpackAppName(state.data, state.scene);
-  const isTerminal = appName === 'deepin-terminal';
+  const sceneSource = appName === 'deepin-terminal' ? 'deepin-terminal'
+                    : appName === 'code' ? 'vscode'
+                    : null;
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
       const idx = row * COLS + col;
       const [mod, key] = km.getKeyAt(state.data, state.scene, layer, idx);
-      // 先匹配当前场景专属表（仅 deepin-terminal），未命中再兜底系统全局热键
-      let friendly = isTerminal ? km.lookupFriendlyName(mod, key, 'deepin-terminal') : null;
+      // 先匹配当前场景专属表（deepin-terminal / code），未命中再兜底系统全局热键
+      let friendly = sceneSource ? km.lookupFriendlyName(mod, key, sceneSource) : null;
       let matchedSource = friendly ? 'app' : null;
       if (!friendly) {
         friendly = km.lookupFriendlyName(mod, key, 'system');
@@ -346,7 +348,9 @@ function switchEditMode(mode) {
   if (isDeepin) {
     // 根据当前编辑场景的应用名，自动索引到「系统快捷键 / 终端快捷键」
     const appName = km.unpackAppName(state.data, state.scene);
-    const src = appName === 'deepin-terminal' ? 'terminal' : 'system';
+    const src = appName === 'deepin-terminal' ? 'terminal'
+              : appName === 'code' ? 'vscode'
+              : 'system';
     document.querySelectorAll('.deepin-tab').forEach(t =>
       t.classList.toggle('active', t.dataset.source === src));
     buildDeepinList(src);
@@ -365,7 +369,9 @@ function openEdit(idx, layer) {
   const isMouse = km.isMouseAction(mod);
   // 若该键命中 deepin 系统/终端快捷键表，则自动进入 Deepin 编辑模式
   const appName = km.unpackAppName(state.data, state.scene);
-  const deepinSource = appName === 'deepin-terminal' ? 'deepin-terminal' : 'system';
+  const deepinSource = appName === 'deepin-terminal' ? 'deepin-terminal'
+                     : appName === 'code' ? 'vscode'
+                     : 'system';
   const hitDeepin = !isMouse && km.lookupFriendlyName(mod, key, deepinSource);
   const openMode = isMouse ? 'mouse' : (hitDeepin ? 'deepin' : 'keyboard');
   document.querySelector('input[name="editMode"][value="' + openMode + '"]').checked = true;
@@ -400,7 +406,9 @@ function closeEdit() {
 function buildDeepinList(source) {
   const root = $('deepinList');
   root.innerHTML = '';
-  const data = source === 'terminal' ? km.DEEPIN_TERMINAL_SHORTCUTS : km.DEEPIN_SHORTCUTS;
+  const data = source === 'terminal' ? km.DEEPIN_TERMINAL_SHORTCUTS
+             : source === 'vscode' ? km.VSCODE_SHORTCUTS
+             : km.DEEPIN_SHORTCUTS;
   for (const group of data) {
     const cat = document.createElement('div');
     cat.className = 'deepin-cat';

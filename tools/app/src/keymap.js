@@ -298,15 +298,23 @@ const DEFAULT_FN_TERMINAL = [
   [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],           // Fn/鼠标左/下/右
 ];
 
-// 浏览器主层（firefox）
-const DEFAULT_MAIN_BROWSER = [
-  [0x01, 0x17], [0x00, 0xe3], [0x05, 0x04], [0x05, 0x15],  // Ctrl+T/启动器/截图/录屏
-  [0x04, 0x2b], [0x08, 0x07], [0x08, 0x08], [0x08, 0x0f],
-  [0x01, 0x1a], [0x03, 0x11], [0x01, 0x15], [0x04, 0x50],  // Ctrl+W/新窗口/刷新/Alt+←
-  [0xff, 0x00], [0x01, 0x0f], [0x03, 0x17], [0x01, 0x07],  // Fn/地址栏/恢复/书签
+// VS Code 主层（code，与固件 src/keyMap.h 槽2 主层一致）
+const DEFAULT_MAIN_CODE = [
+  [0x03, 0x13], [0x01, 0x13], [0x01, 0x16], [0x01, 0x35],  // Ctrl+Shift+P/Ctrl+P/Ctrl+S/Ctrl+`
+  [0x01, 0x30], [0x01, 0x2f], [0x06, 0x51], [0x06, 0x52],  // Ctrl+]/Ctrl+[/Shift+Alt+↓/↑
+  [0x04, 0x51], [0x04, 0x52], [0x01, 0x07], [0x03, 0x0f],  // Alt+↓/↑/Ctrl+D/Ctrl+Shift+L
+  [0xff, 0x00], [0x01, 0x38], [0x03, 0x0e], [0x01, 0x28],  // Fn/Ctrl+//Ctrl+Shift+K/Ctrl+Enter
 ];
 
-// 通用 Fn 层（槽 2~5 共用）32 字节：[mod,key]×16
+// VS Code Fn 层（code，与固件 src/keyMap.h 槽2 Fn 层一致）：调试/重构/查找 + 鼠标
+const DEFAULT_FN_CODE = [
+  [0x00, 0x3e], [0x00, 0x42], [0x00, 0x45], [0x00, 0x3b],  // F5/F9/F12/F2
+  [0x00, 0x41], [0x01, 0x37], [0x03, 0x28], [0x01, 0x09],  // F8/Ctrl+./Ctrl+Shift+Enter/Ctrl+F
+  [0x01, 0x0b], [0xfe, 1], [0xfe, 4], [0xfe, 2],           // Ctrl+H/鼠标左/上/右
+  [0xff, 0x00], [0xfe, 6], [0xfe, 5], [0xfe, 7],           // Fn/鼠标左/下/右
+];
+
+// 通用 Fn 层（槽 3~5 共用）32 字节：[mod,key]×16
 const DEFAULT_FN = [
   [0, 0x29], [0, 0x3a], [0, 0x3b], [0, 0x3c],
   [0, 0x2b], [0, 0x44], [0, 0x45], [0, 0x08],
@@ -327,10 +335,10 @@ function flatten(entries) {
 // 生成默认键位映射 Uint8Array(480)：6 槽 × 80 字节
 export function makeDefaultKeymap() {
   const raw = new Uint8Array(KEYMAP_SIZE);
-  const names = ['generic', 'deepin-terminal', '', '', '', ''];
-  const mains = [DEFAULT_MAIN, DEFAULT_MAIN_TERMINAL, DEFAULT_MAIN_BROWSER,
+  const names = ['generic', 'deepin-terminal', 'code', '', '', ''];
+  const mains = [DEFAULT_MAIN, DEFAULT_MAIN_TERMINAL, DEFAULT_MAIN_CODE,
                  DEFAULT_MAIN, DEFAULT_MAIN, DEFAULT_MAIN];
-  const fns = [DEFAULT_FN_GENERIC, DEFAULT_FN_TERMINAL, DEFAULT_FN,
+  const fns = [DEFAULT_FN_GENERIC, DEFAULT_FN_TERMINAL, DEFAULT_FN_CODE,
                DEFAULT_FN, DEFAULT_FN, DEFAULT_FN];
   for (let s = 0; s < SCENE_MAX; s++) {
     packAppName(raw, s, names[s]);
@@ -431,9 +439,11 @@ export function formatKeymapText(data) {
   return out;
 }
 
-// 按 (mod,key) 查询 deepin 可读快捷键条目；source='terminal' 用终端表，否则系统表
+// 按 (mod,key) 查询可读快捷键条目；source='deepin-terminal'/'vscode' 用对应表，否则系统表
 export function lookupFriendlyName(mod, key, source) {
-  const data = source === 'deepin-terminal' ? DEEPIN_TERMINAL_SHORTCUTS : DEEPIN_SHORTCUTS;
+  const data = source === 'deepin-terminal' ? DEEPIN_TERMINAL_SHORTCUTS
+             : source === 'vscode' ? VSCODE_SHORTCUTS
+             : DEEPIN_SHORTCUTS;
   for (const group of data) {
     for (const it of group.items) {
       if (it.mod === mod && it.key === key) return it;
@@ -652,6 +662,84 @@ export const DEEPIN_TERMINAL_SHORTCUTS = [
       { name: '自定义命令',               mod: 0x04, key: 0x49, label: 'Alt+Ins' },
       { name: '远程管理',                 mod: 0x04, key: 0x4c, label: 'Alt+Del' },
       { name: '光标焦点切换至“+”图标',    mod: 0x08, key: 0x2b, label: 'Super+Tab' }
+    ]
+  }
+];
+
+// VS Code 快捷键（Linux 默认键位，供编辑弹窗快速选择；与 DEEPIN_*_SHORTCUTS 同构）
+export const VSCODE_SHORTCUTS = [
+  {
+    category: '通用',
+    items: [
+      { name: '命令面板',         mod: 0x03, key: 0x13, label: 'Ctrl+Shift+P' },
+      { name: '快速打开文件',     mod: 0x01, key: 0x13, label: 'Ctrl+P' },
+      { name: '保存',             mod: 0x01, key: 0x16, label: 'Ctrl+S' },
+      { name: '另存为',           mod: 0x03, key: 0x16, label: 'Ctrl+Shift+S' },
+      { name: '撤销',             mod: 0x01, key: 0x1d, label: 'Ctrl+Z' },
+      { name: '重做',             mod: 0x01, key: 0x1c, label: 'Ctrl+Y' },
+      { name: '查找',             mod: 0x01, key: 0x09, label: 'Ctrl+F' },
+      { name: '替换',             mod: 0x01, key: 0x0b, label: 'Ctrl+H' }
+    ]
+  },
+  {
+    category: '编辑',
+    items: [
+      { name: '缩进',             mod: 0x01, key: 0x30, label: 'Ctrl+]' },
+      { name: '反缩进',           mod: 0x01, key: 0x2f, label: 'Ctrl+[' },
+      { name: '删除行',           mod: 0x03, key: 0x0e, label: 'Ctrl+Shift+K' },
+      { name: '下方插入行',       mod: 0x01, key: 0x28, label: 'Ctrl+Enter' },
+      { name: '上方插入行',       mod: 0x03, key: 0x28, label: 'Ctrl+Shift+Enter' },
+      { name: '下移行',           mod: 0x04, key: 0x51, label: 'Alt+Down' },
+      { name: '上移行',           mod: 0x04, key: 0x52, label: 'Alt+Up' },
+      { name: '向下复制行',       mod: 0x07, key: 0x51, label: 'Ctrl+Shift+Alt+Down' },
+      { name: '向上复制行',       mod: 0x07, key: 0x52, label: 'Ctrl+Shift+Alt+Up' },
+      { name: '行注释',           mod: 0x01, key: 0x38, label: 'Ctrl+/' },
+      { name: '块注释',           mod: 0x03, key: 0x04, label: 'Ctrl+Shift+A' },
+      { name: '选中下一个匹配',   mod: 0x01, key: 0x07, label: 'Ctrl+D' },
+      { name: '全选匹配',         mod: 0x03, key: 0x0f, label: 'Ctrl+Shift+L' },
+      { name: '跳转匹配括号',     mod: 0x03, key: 0x31, label: 'Ctrl+Shift+\\' },
+      { name: '快速修复',         mod: 0x01, key: 0x37, label: 'Ctrl+.' },
+      { name: '触发补全',         mod: 0x01, key: 0x2c, label: 'Ctrl+Space' },
+      { name: '格式化文档',       mod: 0x03, key: 0x0c, label: 'Ctrl+Shift+I' },
+      { name: '向下插入光标',     mod: 0x06, key: 0x51, label: 'Shift+Alt+Down' },
+      { name: '向上插入光标',     mod: 0x06, key: 0x52, label: 'Shift+Alt+Up' }
+    ]
+  },
+  {
+    category: '导航',
+    items: [
+      { name: '转到定义',         mod: 0x00, key: 0x45, label: 'F12' },
+      { name: '转到引用',         mod: 0x02, key: 0x45, label: 'Shift+F12' },
+      { name: '下一个错误',       mod: 0x00, key: 0x41, label: 'F8' },
+      { name: '上一个错误',       mod: 0x02, key: 0x41, label: 'Shift+F8' },
+      { name: '跳转行',           mod: 0x01, key: 0x0a, label: 'Ctrl+G' },
+      { name: '符号导航',         mod: 0x03, key: 0x12, label: 'Ctrl+Shift+O' },
+      { name: '重命名符号',       mod: 0x00, key: 0x3b, label: 'F2' }
+    ]
+  },
+  {
+    category: '调试',
+    items: [
+      { name: '启动/继续',        mod: 0x00, key: 0x3e, label: 'F5' },
+      { name: '切换断点',         mod: 0x00, key: 0x42, label: 'F9' },
+      { name: '单步进入',         mod: 0x00, key: 0x44, label: 'F11' },
+      { name: '单步跳过',         mod: 0x00, key: 0x43, label: 'F10' }
+    ]
+  },
+  {
+    category: '视图/文件',
+    items: [
+      { name: '资源管理器',       mod: 0x03, key: 0x08, label: 'Ctrl+Shift+E' },
+      { name: '搜索',             mod: 0x03, key: 0x09, label: 'Ctrl+Shift+F' },
+      { name: '源代码管理',       mod: 0x03, key: 0x0a, label: 'Ctrl+Shift+G' },
+      { name: '运行和调试',       mod: 0x03, key: 0x07, label: 'Ctrl+Shift+D' },
+      { name: '扩展',             mod: 0x03, key: 0x1b, label: 'Ctrl+Shift+X' },
+      { name: '集成终端',         mod: 0x01, key: 0x35, label: 'Ctrl+`' },
+      { name: '侧边栏',           mod: 0x01, key: 0x05, label: 'Ctrl+B' },
+      { name: '关闭编辑器',       mod: 0x01, key: 0x1a, label: 'Ctrl+W' },
+      { name: '恢复关闭的编辑器', mod: 0x03, key: 0x17, label: 'Ctrl+Shift+T' },
+      { name: '新建文件',         mod: 0x01, key: 0x11, label: 'Ctrl+N' },
+      { name: '打开文件',         mod: 0x01, key: 0x12, label: 'Ctrl+O' }
     ]
   }
 ];

@@ -100,31 +100,38 @@ UINT8C __at(0x3600) sceneMapTable[SCENE_MAX][SCENE_MAP_SIZE] = {
         0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
-    // ---- 槽 2：场景 2（编号 2，应用名 firefox，浏览器定制键位） ----
+    // ---- 槽 2：场景 2（编号 2，应用名 code，VS Code 定制键位） ----
     {
         /* 应用名 0..15 */
-        'f','i','r','e','f','o','x', 0,0,0,0,0,0,0,0,0,
-        /* 主层键位 16..47（浏览器定制） */
-        KEY_MOD_LCTRL, KEY_T,                  // Ctrl+T         新建标签页
-        0, KEY_LEFTMETA,                       // Super          启动器
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_A,     // Ctrl+Alt+A     截图
-        KEY_MOD_LCTRL|KEY_MOD_LALT, KEY_R,     // Ctrl+Alt+R     录屏
-        KEY_MOD_LALT, KEY_TAB,                 // Alt+Tab        切换窗口
-        KEY_MOD_LMETA, KEY_D,                  // Super+D        显示桌面
-        KEY_MOD_LMETA, KEY_E,                  // Super+E        文件管理器
-        KEY_MOD_LMETA, KEY_L,                  // Super+L        锁屏
-        KEY_MOD_LCTRL, KEY_W,                  // Ctrl+W         关闭标签页
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_N,   // Ctrl+Shift+N   新开窗口
-        KEY_MOD_LCTRL, KEY_R,                  // Ctrl+R         刷新
-        KEY_MOD_LALT, KEY_LEFT,                // Alt+←          后退
-        KEY_FnX, 0,                            // Fn             切换 Fn 层
-        KEY_MOD_LCTRL, KEY_L,                  // Ctrl+L         定位地址栏
-        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_T,   // Ctrl+Shift+T   恢复关闭标签页
-        KEY_MOD_LCTRL, KEY_D,                  // Ctrl+D         加入书签
-        /* Fn 层键位 48..79（通用功能键） */
-        0, KEY_ESC,  0, KEY_F1,  0, KEY_F2,  0, KEY_F3,
-        0, KEY_TAB,  0, KEY_F11, 0, KEY_F12, 0, KEY_E,
-        0, KEY_CAPSLOCK, 0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
+        'c','o','d','e', 0,0,0,0,0,0,0,0,0,0,0,0,
+        /* 主层键位 16..47（VS Code 编辑优先） */
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_P,      // Ctrl+Shift+P   命令面板
+        KEY_MOD_LCTRL, KEY_P,                     // Ctrl+P         快速打开文件
+        KEY_MOD_LCTRL, KEY_S,                     // Ctrl+S         保存
+        KEY_MOD_LCTRL, KEY_GRAVE,                 // Ctrl+`         集成终端
+        KEY_MOD_LCTRL, KEY_RIGHTBRACE,            // Ctrl+]         缩进
+        KEY_MOD_LCTRL, KEY_LEFTBRACE,             // Ctrl+[         反缩进
+        KEY_MOD_LSHIFT|KEY_MOD_LALT, KEY_DOWN,    // Shift+Alt+↓    向下插入光标（列编辑）
+        KEY_MOD_LSHIFT|KEY_MOD_LALT, KEY_UP,      // Shift+Alt+↑    向上插入光标（列编辑）
+        KEY_MOD_LALT, KEY_DOWN,                   // Alt+↓          下移行
+        KEY_MOD_LALT, KEY_UP,                     // Alt+↑          上移行
+        KEY_MOD_LCTRL, KEY_D,                     // Ctrl+D         选中下一个匹配
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_L,      // Ctrl+Shift+L   全选匹配
+        KEY_FnX, 0,                               // Fn             切换 Fn 层
+        KEY_MOD_LCTRL, KEY_SLASH,                 // Ctrl+/         行注释
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_K,      // Ctrl+Shift+K   删除行
+        KEY_MOD_LCTRL, KEY_ENTER,                 // Ctrl+Enter     下方插入行
+        /* Fn 层键位 48..79（调试/重构/查找 + 鼠标） */
+        0, KEY_F5,                                // F5             启动/继续调试
+        0, KEY_F9,                                // F9             切换断点
+        0, KEY_F12,                               // F12            转到定义
+        0, KEY_F2,                                // F2             重命名符号
+        0, KEY_F8,                                // F8             下一个错误
+        KEY_MOD_LCTRL, KEY_DOT,                   // Ctrl+.         快速修复
+        KEY_MOD_LCTRL|KEY_MOD_LSHIFT, KEY_ENTER,  // Ctrl+Shift+Enter 上方插入行
+        KEY_MOD_LCTRL, KEY_F,                     // Ctrl+F         查找
+        KEY_MOD_LCTRL, KEY_H,                     // Ctrl+H         替换
+        0xFE, MOUSE_LCLICK, 0xFE, MOUSE_UP, 0xFE, MOUSE_RCLICK,
         KEY_FnX, 0,  0xFE, MOUSE_LEFT, 0xFE, MOUSE_DOWN, 0xFE, MOUSE_RIGHT,
     },
     // ---- 槽 3：预留场景（编号 3，应用名为空，沿用通用键位） ----

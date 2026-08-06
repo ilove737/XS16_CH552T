@@ -56,7 +56,7 @@
         <div class="mode-toggle">
           <label><input type="radio" name="editMode" value="keyboard" checked> 键盘按键</label>
           <label><input type="radio" name="editMode" value="mouse"> 鼠标动作</label>
-          <label><input type="radio" name="editMode" value="deepin"> Deepin系统</label>
+          <label><input type="radio" name="editMode" value="deepin"> 快捷键</label>
         </div>
         <fieldset class="mod-fieldset" id="modFieldset" hidden>
           <legend>修饰符</legend>
@@ -103,6 +103,7 @@
           <div class="deepin-tabs" id="deepinTabs">
             <button type="button" class="deepin-tab active" data-source="system">系统快捷键</button>
             <button type="button" class="deepin-tab" data-source="terminal">终端快捷键</button>
+            <button type="button" class="deepin-tab" data-source="vscode">VS Code 快捷键</button>
           </div>
           <div id="deepinList"></div>
         </fieldset>
