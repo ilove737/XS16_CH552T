@@ -649,7 +649,10 @@ pub fn run() {
 fn stop_poll_on_exit(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
     state.poll.running.store(false, Ordering::SeqCst);
-    if let Some(h) = state.auto_poll.lock().unwrap().take() {
-        let _ = h.join();
+    {
+        let h = state.auto_poll.lock().unwrap().take();
+        if let Some(h) = h {
+            let _ = h.join();
+        }
     }
 }
