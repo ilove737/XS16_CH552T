@@ -15,6 +15,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, RunEvent, State, WindowEvent,
 };
+#[cfg(target_os = "linux")]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 const VID: u16 = 0x4c58;
