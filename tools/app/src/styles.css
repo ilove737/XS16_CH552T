@@ -97,6 +97,8 @@ main {
   flex: 1;
   padding: 16px 20px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 .layers {
   display: flex;
@@ -180,18 +182,13 @@ main {
   justify-content: center;
 }
 .scene-item.active .scene-idx { box-shadow: 0 0 0 3px rgba(0,0,0,.18); }
-/* 外部激活场景：在场景项右上角显示绿色原点，仅提示，不选中 */
-.scene-item.active-poll { position: relative; }
-.scene-item.active-poll::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #2ecc71;
-  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.25);
+/* 外部激活场景：场景号绿色呼吸光晕，仅提示，不选中 */
+.scene-item.active-poll .scene-idx {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.25); }
+  50%      { box-shadow: 0 0 0 7px rgba(46, 204, 113, 0.5); }
 }
 .scene-info {
   display: flex;
@@ -408,6 +405,56 @@ main {
   white-space: nowrap;
 }
 .deepin-item.selected .deepin-combo { background: rgba(255,255,255,.25); color: #fff; }
+
+.log-panel {
+  margin-top: 16px;
+  flex: 1;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #f0f2f5;
+  font-size: 12px;
+  color: #666;
+  border-bottom: 1px solid #e1e4e8;
+}
+.log-clear-btn {
+  padding: 3px 10px;
+  border: 1px solid #cfd4da;
+  background: #f8f9fa;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background .15s;
+}
+.log-clear-btn:hover { background: #eef1f5; }
+.log-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 12px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  color: #333;
+}
+.log-entry {
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.log-entry .time { color: #888; }
+.log-entry .app { color: #2980b9; }
+.log-entry .scene { color: #c0392b; }
+.log-entry .title { color: #777; }
 
 .statusbar {
   padding: 6px 16px;

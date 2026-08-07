@@ -23,6 +23,10 @@
       "csp": null
     }
   },
+  "plugins": {
+    "dialog": null,
+    "fs": null
+  },
   "bundle": {
     "active": true,
     "targets": ["deb", "dmg", "msi", "nsis"],

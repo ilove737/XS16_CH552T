@@ -35,14 +35,20 @@
           <div class="grid" id="gridFn"></div>
         </div>
       </div>
-      <p class="grid-hint">点击任意按键进行编辑。每个按键 2 字节：[修饰符, 键码]。</p>
+      <div class="log-panel" id="logPanel">
+        <div class="log-header">
+          <span>日志</span>
+          <button id="btnClearLog" class="log-clear-btn">清空</button>
+        </div>
+        <div class="log-content" id="logContent"></div>
+      </div>
     </section>
     <aside class="scene-panel">
       <div class="scene-panel-title">
         <span>场景列表</span>
       </div>
       <ul id="sceneList" class="scene-list"></ul>
-      <p class="hint" id="sceneHint">点击场景项切换编辑。各场景名取自该槽前 16 字节。</p>
+      <p class="hint" id="sceneHint">点击场景项切换编辑。场景名应取自日志里获取到的应用名。</p>
     </aside>
   </main>
 

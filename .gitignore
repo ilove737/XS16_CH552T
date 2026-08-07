@@ -61,7 +61,6 @@ __pycache__/
 # Node / npm
 node_modules/
 tools/app/dist/
-tools/app/package-lock.json
 
 # Rust / Tauri build output
 tools/app/src-tauri/target/

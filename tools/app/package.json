@@ -10,7 +10,9 @@
     "tauri-dev": "npm run build && cargo tauri dev"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0"
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-fs": "^2.5.1"
   },
   "devDependencies": {
     "esbuild": "^0.21.5"

@@ -595,6 +595,8 @@ fn log_prefix() -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(AppState::default())
         .setup(|app| {
             // 创建系统托盘（图标 + 菜单 + 托盘点击恢复窗口）

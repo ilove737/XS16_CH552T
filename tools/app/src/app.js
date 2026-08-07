@@ -71,6 +71,7 @@ async function syncActiveScene() {
       if (s !== state.activeScene) {
         state.activeScene = s;
         highlightScene();
+        appendLog(st, s);
       }
       setStatus(`当前激活场景：场景${s}（${sceneLabel(s)}）`);
     }
@@ -79,10 +80,33 @@ async function syncActiveScene() {
   }
 }
 
+// 向日志框追加一条记录（scene≥0 为场景切换，-1 为导出等操作日志）
+function appendLog(status, scene) {
+  const logContent = $('logContent');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const now = new Date();
+  const time = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+  const sceneLabel = scene >= 0 ? `场景${scene}` : '导出';
+  entry.innerHTML =
+    `<span class="time">[${time}]</span> ` +
+    `<span class="app">${status.app_name}</span>` +
+    (status.pid ? ` (pid=${status.pid})` : '') +
+    ` → ` +
+    `<span class="scene">${sceneLabel}</span>` +
+    ` <span class="title">「${status.title || ''}」</span>`;
+  logContent.appendChild(entry);
+  logContent.scrollTop = logContent.scrollHeight;
+  // 保留最近 200 条
+  while (logContent.children.length > 200) {
+    logContent.removeChild(logContent.firstChild);
+  }
+}
+
 /** 当前场景槽的显示名（优先应用名，否则 "槽N"） */
 function sceneLabel(scene) {
   const name = km.unpackAppName(state.data, scene);
-  return name || (scene === 0 ? '主层' : `场景${scene}`);
+  return name || (`场景${scene}`);
 }
 
 /** 动态构建右侧场景列表（每项来自各槽前 16 字节应用名），点击切换编辑槽 */
@@ -107,7 +131,7 @@ function buildSceneList() {
     nameInput.className = 'scene-name-input';
     nameInput.value = km.unpackAppName(state.data, s);
     nameInput.placeholder = `槽${s} · 未命名`;
-    nameInput.title = '编辑该场景应用名（支持 ; 分隔多个别名），点击「下发当前场景」时一并写入 Flash';
+    nameInput.title = '编辑该场景应用名（支持 ; 分隔多个别名）';
     nameInput.spellcheck = false;
     // 阻止点击输入框时冒泡触发 li 的场景切换
     nameInput.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -119,11 +143,7 @@ function buildSceneList() {
       setStatus(`场景槽 ${s} 应用名已更新为「${nameInput.value || '(空)'}」`);
     });
 
-    const layers = document.createElement('span');
-    layers.className = 'scene-layers';
-    layers.textContent = '主层 / Fn 层';
-
-    info.append(nameInput, layers);
+    info.append(nameInput);
     li.append(idx, info);
     li.addEventListener('click', () => {
       state.scene = s;
@@ -688,24 +708,42 @@ function exportFilename(ext) {
   return `keymap_XS16_${ts}.${ext}`;
 }
 
-function exportTxt() {
+async function exportTxt() {
   if (!state.currentDevice) { alert('请先连接键盘后再导出。'); return; }
   const text = km.formatKeymapText(state.data);
   const name = exportFilename('txt');
-  downloadBlob(new Blob([text], { type: 'text/plain' }), name);
-  setStatus('已导出 ' + name);
+  const { save } = await import('@tauri-apps/plugin-dialog');
+  const { writeFile } = await import('@tauri-apps/plugin-fs');
+  const filePath = await save({
+    defaultPath: name,
+    filters: [{ name: '文本文件', extensions: ['txt'] }, { name: '所有文件', extensions: ['*'] }],
+  });
+  if (!filePath) return;
+  await writeFile(filePath, new TextEncoder().encode(text));
+  setStatus('已导出 ' + filePath);
+  appendLog({ app_name: '导出', pid: 0, title: filePath }, -1);
 }
 
-function exportBin() {
+async function exportBin() {
   if (!state.currentDevice) { alert('请先连接键盘后再导出。'); return; }
   const name = exportFilename('bin');
-  downloadBlob(new Blob([state.data], { type: 'application/octet-stream' }), name);
-  setStatus('已导出 ' + name);
+  const { save } = await import('@tauri-apps/plugin-dialog');
+  const { writeFile } = await import('@tauri-apps/plugin-fs');
+  const filePath = await save({
+    defaultPath: name,
+    filters: [{ name: '二进制文件', extensions: ['bin'] }, { name: '所有文件', extensions: ['*'] }],
+  });
+  if (!filePath) return;
+  const bytes = Array.from(state.data);
+  await writeFile(filePath, new Uint8Array(bytes));
+  setStatus('已导出 ' + filePath);
+  appendLog({ app_name: '导出', pid: 0, title: filePath }, -1);
 }
 
 // ---- 事件绑定 ----
 
 function bindEvents() {
+  $('btnClearLog').onclick = () => { $('logContent').innerHTML = ''; };
   $('btnRead').onclick = onRead;
   $('btnWrite').onclick = onWrite;
   $('btnDefault').onclick = onDefault;
