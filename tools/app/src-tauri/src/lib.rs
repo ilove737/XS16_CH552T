@@ -213,7 +213,8 @@ fn send_scene(scene_id: u8, state: State<AppState>) -> Result<(), String> {
     r
 }
 
-// X11 前台应用检测（纯 Rust 实现）
+// X11 前台应用检测（纯 Rust 实现，仅 Linux）
+#[cfg(target_os = "linux")]
 fn active_app_impl() -> Result<ActiveApp, String> {
     use x11rb::connection::Connection;
     use x11rb::protocol::xproto::ConnectionExt;
@@ -316,6 +317,7 @@ fn active_app_impl() -> Result<ActiveApp, String> {
     })
 }
 
+#[cfg(target_os = "linux")]
 fn intern_atom<C: x11rb::connection::Connection>(
     conn: &C,
     name: &[u8],
@@ -331,14 +333,22 @@ fn intern_atom<C: x11rb::connection::Connection>(
 
 #[tauri::command]
 fn active_app(state: State<AppState>) -> Result<ActiveApp, String> {
-    let app = active_app_impl()?;
-    let mut last = state.last_active_app.lock().unwrap();
-    if *last != app.app_name {
-        println!("{} [active_app] app={} pid={} title=\"{}\"",
-            log_prefix(), app.app_name, app.pid, app.title);
-        *last = app.app_name.clone();
+    #[cfg(target_os = "linux")]
+    {
+        let app = active_app_impl()?;
+        let mut last = state.last_active_app.lock().unwrap();
+        if *last != app.app_name {
+            println!("{} [active_app] app={} pid={} title=\"{}\"",
+                log_prefix(), app.app_name, app.pid, app.title);
+            *last = app.app_name.clone();
+        }
+        Ok(app)
     }
-    Ok(app)
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = &state;
+        Err("active_app 仅在 Linux (X11) 上支持".to_string())
+    }
 }
 
 // 从真相源 480 字节中匹配前台 app 名到场景槽
@@ -389,7 +399,8 @@ fn match_app_to_scene(keymap: &[u8], app_name: &str) -> i32 {
     0
 }
 
-// 轮询线程：每 1s 检测前台应用，匹配到场景且变化才下发
+// 轮询线程：每 1s 检测前台应用，匹配到场景且变化才下发（仅 Linux）
+#[cfg(target_os = "linux")]
 fn poll_loop(shared: std::sync::Arc<PollShared>) {
     loop {
         if !shared.running.load(Ordering::SeqCst) {
@@ -430,6 +441,11 @@ fn poll_loop(shared: std::sync::Arc<PollShared>) {
 
 #[tauri::command]
 fn start_auto_poll(state: State<AppState>) -> Result<(), String> {
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = &state;
+        return Ok(());
+    }
     let mut handle = state.auto_poll.lock().unwrap();
     if handle.is_some() {
         return Ok(()); // 已在运行
@@ -443,6 +459,11 @@ fn start_auto_poll(state: State<AppState>) -> Result<(), String> {
 
 #[tauri::command]
 fn stop_auto_poll(state: State<AppState>) -> Result<(), String> {
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = &state;
+        return Ok(());
+    }
     let mut handle = state.auto_poll.lock().unwrap();
     if handle.is_none() {
         return Ok(());
@@ -457,22 +478,30 @@ fn stop_auto_poll(state: State<AppState>) -> Result<(), String> {
 // 返回当前前台应用 + 已匹配场景，供前端"当前应用"栏展示
 #[tauri::command]
 fn get_poll_status(state: State<AppState>) -> Result<PollStatus, String> {
-    let app = match active_app_impl() {
-        Ok(a) => a,
-        Err(e) => {
-            // 检测失败也要记录，便于排查 X11 / Wayland / 权限问题
-            println!("{} [get_poll_status] active_app failed: {}", log_prefix(), e);
-            return Err(e);
-        }
-    };
-    let km = state.poll.keymap.lock().unwrap().clone();
-    let matched_scene = match_app_to_scene(&km, &app.app_name);
-    Ok(PollStatus {
-        app_name: app.app_name,
-        title: app.title,
-        pid: app.pid,
-        matched_scene,
-    })
+    #[cfg(target_os = "linux")]
+    {
+        let app = match active_app_impl() {
+            Ok(a) => a,
+            Err(e) => {
+                // 检测失败也要记录，便于排查 X11 / Wayland / 权限问题
+                println!("{} [get_poll_status] active_app failed: {}", log_prefix(), e);
+                return Err(e);
+            }
+        };
+        let km = state.poll.keymap.lock().unwrap().clone();
+        let matched_scene = match_app_to_scene(&km, &app.app_name);
+        Ok(PollStatus {
+            app_name: app.app_name,
+            title: app.title,
+            pid: app.pid,
+            matched_scene,
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = &state;
+        Err("get_poll_status 仅在 Linux (X11) 上支持".to_string())
+    }
 }
 
 // 创建系统托盘：图标 + 右键菜单（显示窗口 / 退出）+ 左键点击恢复窗口
