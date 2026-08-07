@@ -15,7 +15,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager, RunEvent, State, WindowEvent,
 };
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 const VID: u16 = 0x4c58;
 const PID: u16 = 0x5310;
@@ -529,8 +529,8 @@ fn set_x11_window_icon(window: &tauri::WebviewWindow) -> Option<()> {
     use x11rb::wrapper::ConnectionExt;
 
     // 1. 取 X11 原生窗口 ID
-    let raw = window.raw_window_handle().ok()?;
-    let xid: u32 = match raw {
+    let raw = window.window_handle().ok()?;
+    let xid: u32 = match raw.as_ref() {
         RawWindowHandle::Xlib(h) => h.window as u32,
         _ => return None,
     };
