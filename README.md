@@ -67,5 +67,69 @@
 - 所有CH552特定寄存器定义已转换为SDCC兼容格式
 - USB功能已适配CH552 USB控制器
 
+## 配套工具
+
+本项目除了固件，还提供了两个键位编辑器，用于图形化编辑固件的键位映射、场景配置，并通过 USB / WebHID 与设备通信。
+
+### 桌面端编辑器（tools/app，Tauri v2）
+
+基于 Tauri v2 的跨平台桌面应用（前端为无框架 Vanilla JS，后端为 Rust）。
+
+- 提供图形化键位编辑、设备读写（HID 通信）。
+- 支持「按激活应用自动切换场景」功能（见下节）。
+- 构建方式：
+  ```bash
+  cd tools/app && npm install   # 安装前端依赖
+  npm run build                 # 打包前端到 dist/
+  make -C tools/app app         # 构建发布包
+  # 或 npm run tauri-dev 进行开发调试
+  ```
+
+### Web 端编辑器（tools/web，WebHID）
+
+基于浏览器 WebHID 的纯前端编辑器，无需安装，适合快速修改键位。
+
+- 受浏览器沙箱限制，无法读取前台窗口，因此**不支持**「自动匹配激活应用」功能。
+- 启动方式：
+  ```bash
+  cd tools/web && python3 -m http.server 8000
+  # 浏览器打开 http://localhost:8000 （WebHID 需 localhost 或 HTTPS）
+  ```
+
+## 自动匹配激活应用（场景自动切换）
+
+编辑器在后台轮询当前前台（激活）窗口的应用名，与固件中配置的场景槽应用名匹配，命中即自动下发对应场景，未命中则切回主层（generic）。
+
+- 实现位置：Rust 后端 `tools/app/src-tauri/src/lib.rs`
+  （`active_app_impl` 取前台应用 + `match_app_to_scene` 匹配 + `poll_loop` 轮询下发）。
+- **平台支持：**
+  - ✅ **Linux**：通过 X11 协议（`x11rb` / `libxcb`）读取前台窗口，功能完整可用。
+  - ⚠️ **macOS / Windows**：**暂不支持**。前台窗口探测依赖各平台原生窗口系统接口
+    （macOS 的 `NSWorkspace`、Windows 的 `GetForegroundWindow` 等），
+    当前版本仅在 Linux 上实现，路线图见下方 TODO。
+
+## 待办 / 路线图
+
+### 在 macOS / Windows 实现「自动匹配激活应用」功能（方案 A：原生 FFI）
+
+> 目标：用 Rust 直接调用各平台原生窗口接口，替代当前仅 Linux 可用的 X11 实现，
+> 使桌面端编辑器的「自动切换场景」功能在三个平台上都可用。
+
+1. **[Cargo.toml]** 新增平台专属依赖：
+   - macOS：`objc` / `cocoa`（调用 `NSWorkspace.frontmostApplication` 取 `bundleIdentifier` / `localizedName`）
+   - Windows：`windows` 或 `winapi`（调用 `GetForegroundWindow` / `GetWindowThreadProcessId` / `QueryFullProcessImageName`）
+2. **[lib.rs]** 把 `active_app_impl` 由「仅 Linux」改为三平台各自实现：
+   - Linux：现有 X11 实现（保持不变）
+   - macOS：Objective-C FFI 取前台应用标识
+   - Windows：Win32 API 取前台窗口进程路径，解析出 exe 名
+3. **[lib.rs]** `match_app_to_scene` / `send_scene_impl` / `poll_loop` 架构完全复用，
+   仅「取前台应用名」一步做成平台可插拔（共用同一套匹配/下发逻辑）。
+4. **[lib.rs]** 去掉 `active_app` / `get_poll_status` / `start_auto_poll` / `stop_auto_poll`
+   中 `#[cfg(not(target_os = "linux"))]` 的 Err stub，改为各平台真实实现
+   （或至少 macOS/Windows 各自实现，最后兜底返回 `Err`）。
+5. **[CI]** 调整 `.github/workflows/build.yml`，确保 macOS / Windows target
+   链接对应平台 SDK 成功（注意 Windows 的 MSVC vs gnu target 差异）。
+6. **[前端 app.js]** 把"自动匹配仅 Linux"的提示文案更新为按平台动态提示。
+
 ## 许可证
 基于原始WCH(CH552)示例代码开发
