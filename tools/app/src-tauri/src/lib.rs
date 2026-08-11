@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread;
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 
 use hidapi::HidApi;
@@ -22,8 +23,12 @@ const VID: u16 = 0x4c58;
 const PID: u16 = 0x5310;
 const KEYMAP_LEN: usize = 480; // 6 scenes * 80 bytes（与固件 sceneMapTable[SCENE_MAX][SCENE_MAP_SIZE] 一致）
 const KEYMAP_REPORT_ID: u8 = 0x01; // 固件 KEYMAP_REPORT_ID，与报表描述符一致
+// 以下场景相关常量仅 Linux 前台检测 (match_app_to_scene) 使用
+#[cfg(target_os = "linux")]
 const SCENE_MAX: usize = 6; // 槽 0 为主层，1..5 为场景（与固件 keyMap.h SCENE_MAX 一致）
+#[cfg(target_os = "linux")]
 const SCENE_MAP_SIZE: usize = 80; // 每槽总长度 = 16 应用名 + 32 主层 + 32 Fn 层（与固件 SCENE_MAP_SIZE 一致）
+#[cfg(target_os = "linux")]
 const SCENE_NAME_LEN: usize = 16; // 每个槽前 16 字节为应用名
 
 // 轮询线程所需的可共享状态（用 Arc 包裹，可独立 clone 给线程）
@@ -353,7 +358,8 @@ fn active_app(state: State<AppState>) -> Result<ActiveApp, String> {
 
 // 从真相源 480 字节中匹配前台 app 名到场景槽
 // 每个槽前 16 字节为应用名（遇 \0 截断，按 ; 拆别名，小写化）
-// 返回命中槽号（1..SCENE_MAX），未命中返回 0
+// 返回命中槽号（1..SCENE_MAX），未命中返回 0（仅 Linux 前台检测使用）
+#[cfg(target_os = "linux")]
 fn match_app_to_scene(keymap: &[u8], app_name: &str) -> i32 {
     // 真相源长度不足一个完整槽时无法匹配
     if keymap.len() < KEYMAP_LEN {
@@ -440,12 +446,8 @@ fn poll_loop(shared: std::sync::Arc<PollShared>) {
 }
 
 #[tauri::command]
+#[cfg(target_os = "linux")]
 fn start_auto_poll(state: State<AppState>) -> Result<(), String> {
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = &state;
-        return Ok(());
-    }
     let mut handle = state.auto_poll.lock().unwrap();
     if handle.is_some() {
         return Ok(()); // 已在运行
@@ -457,13 +459,16 @@ fn start_auto_poll(state: State<AppState>) -> Result<(), String> {
     Ok(())
 }
 
+// 非 Linux 平台无 X11 前台检测，自动轮询无意义，直接返回成功
 #[tauri::command]
+#[cfg(not(target_os = "linux"))]
+fn start_auto_poll(_state: State<AppState>) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+#[cfg(target_os = "linux")]
 fn stop_auto_poll(state: State<AppState>) -> Result<(), String> {
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = &state;
-        return Ok(());
-    }
     let mut handle = state.auto_poll.lock().unwrap();
     if handle.is_none() {
         return Ok(());
@@ -472,6 +477,13 @@ fn stop_auto_poll(state: State<AppState>) -> Result<(), String> {
     if let Some(h) = handle.take() {
         let _ = h.join();
     }
+    Ok(())
+}
+
+// 非 Linux 平台无后台轮询线程，直接返回成功
+#[tauri::command]
+#[cfg(not(target_os = "linux"))]
+fn stop_auto_poll(_state: State<AppState>) -> Result<(), String> {
     Ok(())
 }
 
