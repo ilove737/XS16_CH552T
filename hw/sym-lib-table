@@ -1,0 +1,5 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "CH55X") (type "Legacy") (uri "${KIPRJMOD}/CH55X.lib") (options "") (descr ""))
+	(lib (name "XS16-cache") (type "KiCad") (uri "${KIPRJMOD}/XS16-cache.kicad_sym") (options "") (descr "旧版工程缓存库"))
+)
