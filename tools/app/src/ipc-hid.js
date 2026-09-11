@@ -14,6 +14,11 @@ export async function closeDevice(path) {
   return await invoke('close_device', { path });
 }
 
+// 安装 udev 规则，使当前用户无需 root 权限即可访问 XS16 键盘
+export async function installUdevRule() {
+  return await invoke('install_udev_rule');
+}
+
 export async function readKeymap() {
   return await invoke('read_keymap');
 }
@@ -38,6 +43,11 @@ export async function sendScene(sceneId) {
 
 export async function activeApp() {
   return await invoke('active_app');
+}
+
+// 获取所有打开的窗口列表，供前端场景名下拉选择
+export async function listWindows() {
+  return await invoke('list_windows');
 }
 
 // 启动后端自动轮询（X11 检测 + 场景匹配 + 下发）

@@ -6,6 +6,8 @@
     "core:default",
     "shell:allow-open",
     "dialog:allow-save",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
     "fs:allow-write-file",
     "fs:allow-read-file"
   ]

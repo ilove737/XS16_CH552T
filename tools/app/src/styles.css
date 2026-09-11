@@ -197,7 +197,7 @@ main {
   min-width: 0;
   flex: 1;
 }
-.scene-name-input {
+.scene-name-select {
   width: 100%;
   padding: 3px 6px;
   border: 1px solid transparent;
@@ -209,18 +209,15 @@ main {
   outline: none;
   box-sizing: border-box;
   transition: border-color .15s, background .15s;
+  cursor: pointer;
 }
-.scene-name-input:hover {
+.scene-name-select:hover {
   border-color: #cfd4da;
   background: #fff;
 }
-.scene-name-input:focus {
+.scene-name-select:focus {
   border-color: #3498db;
   background: #fff;
-}
-.scene-name-input::placeholder {
-  color: #bbb;
-  font-weight: 400;
 }
 .scene-layers {
   font-size: 11px;

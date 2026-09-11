@@ -4,6 +4,7 @@ import * as km from './keymap.js';
 import * as ipc from './ipc-hid.js';
 import { KeyCapture } from './capture.js';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 const ROWS = 4;
 const COLS = 4;
@@ -46,10 +47,10 @@ function keyNameOf(code) {
 }
 
 // ---- 初始化 ----
-function init() {
+async function init() {
   buildModCheckboxes();
   buildKeynameDatalist();
-  buildSceneList();
+  await buildSceneList();
   initDeepinTabs();
   bindEvents();
   // 启动后端自动轮询（X11 检测 + 场景匹配 + 下发，全部在 Rust 线程中完成）
@@ -110,9 +111,10 @@ function sceneLabel(scene) {
 }
 
 /** 动态构建右侧场景列表（每项来自各槽前 16 字节应用名），点击切换编辑槽 */
-function buildSceneList() {
+async function buildSceneList() {
   const ul = $('sceneList');
   ul.innerHTML = '';
+
   for (let s = 0; s < km.SCENE_MAX; s++) {
     const li = document.createElement('li');
     li.className = 'scene-item';
@@ -126,24 +128,14 @@ function buildSceneList() {
     const info = document.createElement('span');
     info.className = 'scene-info';
 
-    // 场景名可编辑：输入框直接绑定该槽前 16 字节应用名
-    const nameInput = document.createElement('input');
-    nameInput.className = 'scene-name-input';
-    nameInput.value = km.unpackAppName(state.data, s);
-    nameInput.placeholder = `槽${s} · 未命名`;
-    nameInput.title = '编辑该场景应用名（支持 ; 分隔多个别名）';
-    nameInput.spellcheck = false;
-    // 阻止点击输入框时冒泡触发 li 的场景切换
-    nameInput.addEventListener('pointerdown', (e) => e.stopPropagation());
-    nameInput.addEventListener('change', () => {
-      km.packAppName(state.data, s, nameInput.value.trim());
-      ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
-        console.warn('同步键位到后端失败:', e));
-      nameInput.value = km.unpackAppName(state.data, s);
-      setStatus(`场景槽 ${s} 应用名已更新为「${nameInput.value || '(空)'}」`);
-    });
+    // 场景名下拉选择：从当前打开的应用中选取
+    const nameSelect = document.createElement('select');
+    nameSelect.className = 'scene-name-select';
 
-    info.append(nameInput);
+    // 阻止点击下拉框时冒泡触发 li 的场景切换
+    nameSelect.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    info.append(nameSelect);
     li.append(idx, info);
     li.addEventListener('click', () => {
       state.scene = s;
@@ -153,7 +145,102 @@ function buildSceneList() {
     });
     ul.append(li);
   }
+  // 初始填充所有下拉框
+  await refreshAllSelectOptions();
   highlightScene();
+}
+
+/** 刷新单个下拉框的窗口选项（保留当前选中值） */
+async function refreshSelectOptions(select, sceneIdx) {
+  const prev = select.value;
+
+  // 先异步获取窗口列表，期间不清空现有选项
+  let windows = [];
+  try {
+    windows = await ipc.listWindows();
+  } catch (e) {
+    console.warn('获取窗口列表失败:', e);
+  }
+
+  // 获取完成后同步清空并重建选项
+  select.innerHTML = '';
+
+  // 添加空选项（未命名）
+  const emptyOpt = document.createElement('option');
+  emptyOpt.value = '';
+  emptyOpt.textContent = `槽${sceneIdx} · 未命名`;
+  select.append(emptyOpt);
+
+  const currentName = km.unpackAppName(state.data, sceneIdx);
+  let hasMatch = false;
+  const seenNames = new Set();
+  for (const win of windows) {
+    if (!win.app_name || seenNames.has(win.app_name)) continue;
+    seenNames.add(win.app_name);
+    const opt = document.createElement('option');
+    opt.value = win.app_name;
+    opt.textContent = win.app_name;
+    if (win.app_name === currentName) {
+      opt.selected = true;
+      hasMatch = true;
+    }
+    select.append(opt);
+  }
+
+  // 添加自定义选项
+  const customOpt = document.createElement('option');
+  customOpt.value = '__custom__';
+  customOpt.textContent = '自定义...';
+  select.append(customOpt);
+
+  // 如果当前名称不在窗口列表中，显示为自定义值
+  if (currentName && !hasMatch) {
+    emptyOpt.textContent = currentName;
+    emptyOpt.selected = true;
+  } else if (prev && select.value !== prev) {
+    // 尝试恢复之前的选中值
+    for (const opt of select.options) {
+      if (opt.value === prev) {
+        opt.selected = true;
+        break;
+      }
+    }
+  }
+
+  // 绑定 change 事件（每次刷新时重新绑定）
+  select.onchange = () => {
+    const val = select.value;
+    if (val === '__custom__') {
+      const customName = prompt('输入自定义应用名（支持 ; 分隔多个别名）', currentName || '');
+      if (customName !== null) {
+        km.packAppName(state.data, sceneIdx, customName.trim());
+        ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
+          console.warn('同步键位到后端失败:', e));
+        select.value = '';
+        select.options[0].textContent = customName.trim() || `槽${sceneIdx} · 未命名`;
+        setStatus(`场景槽 ${sceneIdx} 应用名已更新为「${customName.trim() || '(空)'}」`);
+      } else {
+        select.value = currentName || '';
+      }
+    } else {
+      km.packAppName(state.data, sceneIdx, val);
+      ipc.setKeymap(new Uint8Array(state.data)).catch((e) =>
+        console.warn('同步键位到后端失败:', e));
+      select.options[0].textContent = val || `槽${sceneIdx} · 未命名`;
+      setStatus(`场景槽 ${sceneIdx} 应用名已更新为「${val || '(空)'}」`);
+    }
+  };
+}
+
+/** 刷新所有下拉框的窗口选项 */
+async function refreshAllSelectOptions() {
+  const ul = $('sceneList');
+  for (let s = 0; s < km.SCENE_MAX; s++) {
+    const li = ul.querySelector(`.scene-item[data-scene="${s}"]`);
+    if (!li) continue;
+    const select = li.querySelector('.scene-name-select');
+    if (select) await refreshSelectOptions(select, s);
+  }
 }
 
 /** 根据各槽应用名刷新场景列表的显示文本（读取设备后调用） */
@@ -162,8 +249,26 @@ function refreshSceneList() {
   for (let s = 0; s < km.SCENE_MAX; s++) {
     const li = ul.querySelector(`.scene-item[data-scene="${s}"]`);
     if (!li) continue;
-    const input = li.querySelector('.scene-name-input');
-    if (input) input.value = km.unpackAppName(state.data, s);
+    const select = li.querySelector('.scene-name-select');
+    if (select) {
+      const name = km.unpackAppName(state.data, s);
+      // 尝试匹配下拉框中的选项
+      let found = false;
+      for (const opt of select.options) {
+        if (opt.value === name) {
+          opt.selected = true;
+          found = true;
+          break;
+        }
+      }
+      if (!found && name) {
+        // 当前名称不在窗口列表中，更新空选项显示为该名称
+        select.options[0].textContent = name;
+        select.options[0].selected = true;
+      } else if (!name) {
+        select.options[0].selected = true;
+      }
+    }
   }
 }
 
@@ -217,6 +322,7 @@ async function autoConnect() {
     setStatus('正在枚举设备…');
     const devs = await ipc.listDevices();
     let ok = 0, fail = 0;
+    let permissionDenied = false;
     for (const dev of devs) {
       if (hasDevice(dev)) { ok++; continue; }
       try {
@@ -226,6 +332,12 @@ async function autoConnect() {
       } catch (e) {
         fail++;
         console.warn('打开设备失败:', dev, e);
+        // 检测权限错误（Linux 下 udev 规则缺失）
+        const msg = String(e).toLowerCase();
+        if (msg.includes('permission denied') || msg.includes('eacces') ||
+            msg.includes('error opening device') || msg.includes('hidapi')) {
+          permissionDenied = true;
+        }
       }
     }
     // 移除已拔出的设备
@@ -239,7 +351,28 @@ async function autoConnect() {
     }
     if (state.devices.length === 0) {
       renderGrids();
-      setStatus('未检测到 XS16 键盘，请确认 USB 已连接');
+      // 权限不足时弹窗提示安装 udev 规则
+      if (permissionDenied && devs.length > 0) {
+        setStatus('键盘权限不足');
+        const shouldInstall = await ask(
+          '检测到键盘权限不足，是否自动安装 udev 规则？\n（需要输入管理员密码）',
+          { title: '权限不足', kind: 'warning' }
+        );
+        if (shouldInstall) {
+          try {
+            setStatus('正在安装 udev 规则…');
+            await ipc.installUdevRule();
+            setStatus('udev 规则已安装，请拔插键盘后重试');
+          } catch (e) {
+            console.warn('安装 udev 规则失败:', e);
+            setStatus('安装失败: ' + String(e));
+          }
+        } else {
+          setStatus('未安装 udev 规则，键盘无法连接');
+        }
+      } else {
+        setStatus('未检测到 XS16 键盘，请确认 USB 已连接');
+      }
     } else if (fail) {
       setStatus(`已枚举 ${ok} 个键盘，但 ${fail} 个打开失败`);
     } else {
@@ -780,6 +913,10 @@ function bindEvents() {
       localStorage.setItem('xs16_tray_hinted', '1');
       setStatus('已最小化到系统托盘，右键托盘图标可退出');
     }
+  });
+  // 窗口获得焦点时刷新场景下拉列表（获取最新的打开程序列表）
+  win.onFocusChanged(({ payload: focused }) => {
+    if (focused) refreshAllSelectOptions();
   });
 }
 

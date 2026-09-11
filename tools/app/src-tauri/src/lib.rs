@@ -73,6 +73,14 @@ struct ActiveApp {
     self_pid: u32,
 }
 
+#[derive(Serialize, Clone)]
+struct WindowInfo {
+    id: u32,          // X11 窗口 ID
+    app_name: String, // WM_CLASS 实例名
+    title: String,    // 窗口标题
+    pid: u32,         // 窗口 PID
+}
+
 #[derive(Serialize)]
 struct PollStatus {
     app_name: String,
@@ -122,6 +130,60 @@ fn close_device(path: String, state: State<AppState>) -> Result<(), String> {
         drop(dev);
     }
     Ok(())
+}
+
+// 安装 udev 规则，使当前用户无需 root 权限即可访问 XS16 键盘
+#[tauri::command]
+#[cfg(target_os = "linux")]
+fn install_udev_rule() -> Result<String, String> {
+    use std::fs;
+    use std::process::Command;
+
+    let rule_path = "/etc/udev/rules.d/99-xs16.rules";
+    let rule_content = r#"SUBSYSTEM=="hidraw", ATTRS{idVendor}=="4c58", ATTRS{idProduct}=="5310", MODE="0666""#;
+
+    // 检查规则文件是否已存在且内容正确
+    if let Ok(existing) = fs::read_to_string(rule_path) {
+        if existing.contains("4c58") && existing.contains("5310") {
+            // 规则已存在，只需 reload
+            let status = Command::new("pkexec")
+                .args(["udevadm", "control", "--reload-rules"])
+                .status()
+                .map_err(|e| format!("执行 pkexec 失败: {}", e))?;
+            if status.success() {
+                // 同时触发 udev 重新加载设备
+                let _ = Command::new("pkexec")
+                    .args(["udevadm", "trigger"])
+                    .status();
+                return Ok("udev 规则已存在，已重新加载".to_string());
+            } else {
+                return Err("用户取消了授权或授权失败".to_string());
+            }
+        }
+    }
+
+    // 通过 pkexec 执行写入规则 + reload（pkexec 会弹出图形密码对话框）
+    let script = format!(
+        "echo '{}' > {} && udevadm control --reload-rules && udevadm trigger",
+        rule_content, rule_path
+    );
+    let status = Command::new("pkexec")
+        .args(["bash", "-c", &script])
+        .status()
+        .map_err(|e| format!("执行 pkexec 失败: {}", e))?;
+
+    if status.success() {
+        Ok("udev 规则已安装成功".to_string())
+    } else {
+        Err("用户取消了授权或授权失败".to_string())
+    }
+}
+
+// 非 Linux 平台无需 udev 规则
+#[tauri::command]
+#[cfg(not(target_os = "linux"))]
+fn install_udev_rule() -> Result<String, String> {
+    Err("udev 规则仅在 Linux 上需要".to_string())
 }
 
 // 读取特征报告 0x01: 键位数据（一次 GetReport 回传整条 481 字节）
@@ -258,10 +320,29 @@ fn active_app_impl() -> Result<ActiveApp, String> {
         });
     }
 
+    // 使用辅助函数读取窗口信息
+    let info = read_window_info(&conn, active)?;
+    let self_pid = std::process::id();
+    Ok(ActiveApp {
+        app_name: info.app_name,
+        title: info.title,
+        pid: info.pid,
+        self_pid,
+    })
+}
+
+// 辅助函数：读取指定 X11 窗口的信息（WM_CLASS、_NET_WM_NAME、_NET_WM_PID）
+#[cfg(target_os = "linux")]
+fn read_window_info<C: x11rb::connection::Connection>(
+    conn: &C,
+    window_id: u32,
+) -> Result<WindowInfo, String> {
+    use x11rb::protocol::xproto::ConnectionExt;
+
     // name = WM_CLASS 实例名（第一个字符串）。WM_CLASS 形如 "instance\0class\0"。
-    let wm_class = intern_atom(&conn, b"WM_CLASS")?;
+    let wm_class = intern_atom(conn, b"WM_CLASS")?;
     let wm_class_reply = conn
-        .get_property(false, active, wm_class, x11rb::protocol::xproto::AtomEnum::STRING, 0, 1024)
+        .get_property(false, window_id, wm_class, x11rb::protocol::xproto::AtomEnum::STRING, 0, 1024)
         .map_err(|e| e.to_string())?
         .reply()
         .map_err(|e| e.to_string())?;
@@ -277,10 +358,10 @@ fn active_app_impl() -> Result<ActiveApp, String> {
     };
 
     // title = 窗口标题：优先 _NET_WM_NAME，回退 WM_NAME
-    let net_wm_name = intern_atom(&conn, b"_NET_WM_NAME")?;
-    let utf8 = intern_atom(&conn, b"UTF8_STRING")?;
+    let net_wm_name = intern_atom(conn, b"_NET_WM_NAME")?;
+    let utf8 = intern_atom(conn, b"UTF8_STRING")?;
     let name_reply = conn
-        .get_property(false, active, net_wm_name, utf8, 0, 1024)
+        .get_property(false, window_id, net_wm_name, utf8, 0, 1024)
         .map_err(|e| e.to_string())?
         .reply()
         .map_err(|e| e.to_string())?;
@@ -288,7 +369,7 @@ fn active_app_impl() -> Result<ActiveApp, String> {
         String::from_utf8_lossy(&name_reply.value).to_string()
     } else {
         let wm_name = conn
-            .get_property(false, active, x11rb::protocol::xproto::AtomEnum::WM_NAME, x11rb::protocol::xproto::AtomEnum::STRING, 0, 1024)
+            .get_property(false, window_id, x11rb::protocol::xproto::AtomEnum::WM_NAME, x11rb::protocol::xproto::AtomEnum::STRING, 0, 1024)
             .map_err(|e| e.to_string())?
             .reply()
             .map_err(|e| e.to_string())?;
@@ -296,9 +377,9 @@ fn active_app_impl() -> Result<ActiveApp, String> {
     };
 
     // pid = 真实窗口 PID（_NET_WM_PID，CARDINAL，4 字节）
-    let net_wm_pid = intern_atom(&conn, b"_NET_WM_PID")?;
+    let net_wm_pid = intern_atom(conn, b"_NET_WM_PID")?;
     let pid_reply = conn
-        .get_property(false, active, net_wm_pid, x11rb::protocol::xproto::AtomEnum::CARDINAL, 0, 4)
+        .get_property(false, window_id, net_wm_pid, x11rb::protocol::xproto::AtomEnum::CARDINAL, 0, 4)
         .map_err(|e| e.to_string())?
         .reply()
         .map_err(|e| e.to_string())?;
@@ -313,12 +394,11 @@ fn active_app_impl() -> Result<ActiveApp, String> {
         0
     };
 
-    let self_pid = std::process::id();
-    Ok(ActiveApp {
+    Ok(WindowInfo {
+        id: window_id,
         app_name,
         title,
         pid,
-        self_pid,
     })
 }
 
@@ -334,6 +414,49 @@ fn intern_atom<C: x11rb::connection::Connection>(
         .reply()
         .map_err(|e| e.to_string())?;
     Ok(reply.atom)
+}
+
+// 获取所有打开的窗口列表（仅 Linux，基于 _NET_CLIENT_LIST）
+#[cfg(target_os = "linux")]
+fn list_windows_impl() -> Result<Vec<WindowInfo>, String> {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::ConnectionExt;
+    use x11rb::xcb_ffi::XCBConnection;
+
+    let (conn, _) = XCBConnection::connect(None).map_err(|e| format!("X11 connect: {}", e))?;
+    let setup = conn.setup();
+    let root = setup.roots[0].root;
+
+    use x11rb::protocol::xproto::AtomEnum;
+
+    // 读取 _NET_CLIENT_LIST（窗口管理器维护的已管理窗口列表）
+    let client_list = intern_atom(&conn, b"_NET_CLIENT_LIST")?;
+    let reply = conn
+        .get_property(false, root, client_list, AtomEnum::WINDOW, 0, u32::MAX)
+        .map_err(|e| e.to_string())?
+        .reply()
+        .map_err(|e| e.to_string())?;
+
+    let window_ids: Vec<u32> = reply
+        .value
+        .chunks_exact(4)
+        .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]))
+        .collect();
+
+    let mut windows = Vec::new();
+    for wid in window_ids {
+        if wid == 0 {
+            continue;
+        }
+        // 读取每个窗口的信息
+        if let Ok(info) = read_window_info(&conn, wid) {
+            // 只添加有应用名的窗口（过滤掉装饰窗口等）
+            if !info.app_name.is_empty() {
+                windows.push(info);
+            }
+        }
+    }
+    Ok(windows)
 }
 
 #[tauri::command]
@@ -353,6 +476,21 @@ fn active_app(state: State<AppState>) -> Result<ActiveApp, String> {
     {
         let _ = &state;
         Err("active_app 仅在 Linux (X11) 上支持".to_string())
+    }
+}
+
+// 返回所有打开的窗口列表，供前端场景名下拉选择
+#[tauri::command]
+fn list_windows(state: State<AppState>) -> Result<Vec<WindowInfo>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = &state;
+        list_windows_impl()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = &state;
+        Err("list_windows 仅在 Linux (X11) 上支持".to_string())
     }
 }
 
@@ -662,12 +800,14 @@ pub fn run() {
             list_devices,
             open_device,
             close_device,
+            install_udev_rule,
             read_keymap,
             write_keymap,
             set_keymap,
             get_keymap,
             send_scene,
             active_app,
+            list_windows,
             start_auto_poll,
             stop_auto_poll,
             get_poll_status,
