@@ -84,9 +84,15 @@
 基于 Tauri v2 的跨平台桌面应用（前端为无框架 Vanilla JS，后端为 Rust）。
 
 - 提供图形化键位编辑、设备读写（HID 通信）。
+- 场景名支持从当前打开的应用列表中选取（下拉选择框，窗口聚焦时自动刷新）。
+- Linux 下连接键盘权限不足时，可自动安装 udev 规则（需输入管理员密码）。
 - 支持「按激活应用自动切换场景」功能（见下节）。
 - 构建方式：
   ```bash
+  # Linux 下需先安装系统依赖
+  sudo apt-get install -y libdbus-1-dev libudev-dev libgtk-3-dev \
+    libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
+
   cd tools/app && npm install   # 安装前端依赖
   npm run build                 # 打包前端到 dist/
   make -C tools/app app         # 构建发布包
